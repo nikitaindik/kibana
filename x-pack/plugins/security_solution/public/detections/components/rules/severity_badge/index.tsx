@@ -22,14 +22,19 @@ const severityToColorMap: Record<Severity, string> = {
 
 interface Props {
   value: Severity;
+  dataTestSubj?: string;
 }
 
-const SeverityBadgeComponent: React.FC<Props> = ({ value }) => {
+const SeverityBadgeComponent: React.FC<Props> = ({ value, dataTestSubj = 'severity' }) => {
   const displayValue = upperFirst(value);
   const color = severityToColorMap[value] ?? 'subdued';
 
   return (
-    <HealthTruncateText healthColor={color} tooltipContent={displayValue} dataTestSubj="severity">
+    <HealthTruncateText
+      healthColor={color}
+      tooltipContent={displayValue}
+      dataTestSubj={dataTestSubj}
+    >
       {displayValue}
     </HealthTruncateText>
   );

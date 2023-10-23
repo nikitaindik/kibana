@@ -40,7 +40,11 @@ const TechniqueLinkItem = styled(EuiButtonEmpty)`
   align-self: flex-start;
 `;
 
-export const ThreatEuiFlexGroup = ({ label, threat }: BuildThreatDescription) => {
+export const ThreatEuiFlexGroup = ({
+  label,
+  threat,
+  dataTestSubj = 'threat',
+}: BuildThreatDescription) => {
   const [techniquesOptions, setTechniquesOptions] = useState<MitreTechnique[]>([]);
   const [tacticsOptions, setTacticsOptions] = useState<MitreTactic[]>([]);
   const [subtechniquesOptions, setSubtechniquesOptions] = useState<MitreSubTechnique[]>([]);
@@ -54,8 +58,9 @@ export const ThreatEuiFlexGroup = ({ label, threat }: BuildThreatDescription) =>
     }
     getMitre();
   }, []);
+
   return (
-    <ThreatEuiFlexGroupStyles direction="column">
+    <ThreatEuiFlexGroupStyles direction="column" data-test-subj={dataTestSubj}>
       {threat.map((singleThreat, index) => {
         const tactic = tacticsOptions.find((t) => t.id === singleThreat.tactic.id);
         return (
