@@ -34,13 +34,13 @@ import {
 import { resetRulesTableState, deleteAlertsAndRules } from '../../../tasks/common';
 import { login } from '../../../tasks/login';
 import {
-  clickAddElasticRulesButton,
   assertInstallationRequestIsComplete,
   assertRuleInstallationSuccessToastShown,
   assertRulesNotPresentInRuleUpdatesTable,
   assertRulesPresentInInstalledRulesTable,
   assertRuleUpgradeSuccessToastShown,
   assertUpgradeRequestIsComplete,
+  clickAddElasticRulesButton,
   clickRuleUpdatesTab,
 } from '../../../tasks/prebuilt_rules';
 import { visitRulesManagementTable } from '../../../tasks/rules_management';
@@ -175,11 +175,10 @@ describe(
         cy.intercept('POST', '/internal/detection_engine/prebuilt_rules/installation/_perform').as(
           'installPrebuiltRules'
         );
+        clickAddElasticRulesButton();
       });
 
       it('should install prebuilt rules one by one', () => {
-        clickAddElasticRulesButton();
-
         // Attempt to install rules
         cy.get(getInstallSingleRuleButtonByRuleId(RULE_1['security-rule'].rule_id)).click();
         // Wait for request to complete
@@ -192,7 +191,6 @@ describe(
       });
 
       it('should install multiple selected prebuilt rules by selecting all in page', () => {
-        clickAddElasticRulesButton();
         cy.get(SELECT_ALL_RULES_ON_PAGE_CHECKBOX).click();
         cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
         assertInstallationRequestIsComplete([RULE_1, RULE_2]);
@@ -203,7 +201,6 @@ describe(
       });
 
       it('should install all available rules at once', () => {
-        clickAddElasticRulesButton();
         cy.get(INSTALL_ALL_RULES_BUTTON).click();
         assertInstallationRequestIsComplete([RULE_1, RULE_2]);
         assertRuleInstallationSuccessToastShown([RULE_1, RULE_2]);
@@ -213,7 +210,6 @@ describe(
       });
 
       it('should display an empty screen when all available prebuilt rules have been installed', () => {
-        clickAddElasticRulesButton();
         cy.get(INSTALL_ALL_RULES_BUTTON).click();
         cy.get(TOASTER).should('be.visible').should('have.text', `2 rules installed successfully.`);
         cy.get(RULE_CHECKBOX).should('not.exist');
