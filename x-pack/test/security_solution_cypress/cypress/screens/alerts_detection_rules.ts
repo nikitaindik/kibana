@@ -193,10 +193,11 @@ export const NO_RULES_AVAILABLE_FOR_UPGRADE_MESSAGE =
   '[data-test-subj="noPrebuiltRulesAvailableForUpgrade"]';
 
 export const INSTALL_PREBUILT_RULE_PREVIEW = '[data-test-subj="installPrebuiltRulePreview"]';
-export const INSTALL_PREBUILT_RULE_BUTTON = '[data-test-subj="installPrebuiltRuleButton"]';
+export const INSTALL_PREBUILT_RULE_BUTTON =
+  '[data-test-subj="installPrebuiltRuleFromFlyoutButton"]';
 
 export const UPDATE_PREBUILT_RULE_PREVIEW = '[data-test-subj="updatePrebuiltRulePreview"]';
-export const UPDATE_PREBUILT_RULE_BUTTON = '[data-test-subj="updatePrebuiltRuleButton"]';
+export const UPDATE_PREBUILT_RULE_BUTTON = '[data-test-subj="updatePrebuiltRuleFromFlyoutButton"]';
 
 export const FLYOUT_CLOSE_BTN = '[data-test-subj="euiFlyoutCloseButton"]';
 

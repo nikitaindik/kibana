@@ -215,11 +215,7 @@ interface ThreatProps {
 }
 
 const Threat = ({ threat }: ThreatProps) => (
-  <ThreatEuiFlexGroup
-    threat={filterEmptyThreats(threat)}
-    label=""
-    dataTestSubj="threatPropertyValue"
-  />
+  <ThreatEuiFlexGroup threat={filterEmptyThreats(threat)} dataTestSubj="threatPropertyValue" />
 );
 
 interface ThreatIndicatorPathProps {

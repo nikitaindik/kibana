@@ -40,11 +40,7 @@ const TechniqueLinkItem = styled(EuiButtonEmpty)`
   align-self: flex-start;
 `;
 
-export const ThreatEuiFlexGroup = ({
-  label,
-  threat,
-  dataTestSubj = 'threat',
-}: BuildThreatDescription) => {
+export const ThreatEuiFlexGroup = ({ threat, dataTestSubj = 'threat' }: BuildThreatDescription) => {
   const [techniquesOptions, setTechniquesOptions] = useState<MitreTechnique[]>([]);
   const [tacticsOptions, setTacticsOptions] = useState<MitreTactic[]>([]);
   const [subtechniquesOptions, setSubtechniquesOptions] = useState<MitreSubTechnique[]>([]);

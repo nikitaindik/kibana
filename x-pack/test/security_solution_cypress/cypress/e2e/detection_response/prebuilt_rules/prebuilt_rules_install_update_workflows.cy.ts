@@ -5,24 +5,15 @@
  * 2.0.
  */
 
-import { omit } from 'lodash';
-import type { Filter } from '@kbn/es-query';
 import type { BulkInstallPackageInfo } from '@kbn/fleet-plugin/common';
-import type { ThreatMapping } from '@kbn/securitysolution-io-ts-alerting-types';
 import type { Rule } from '@kbn/security-solution-plugin/public/detection_engine/rule_management/logic/types';
-import type { PrebuiltRuleAsset } from '@kbn/security-solution-plugin/server/lib/detection_engine/prebuilt_rules';
-import type { Threshold } from '@kbn/security-solution-plugin/common/api/detection_engine/model/rule_schema/specific_attributes/threshold_attributes';
-import { AlertSuppression } from '@kbn/security-solution-plugin/common/api/detection_engine/model/rule_schema/specific_attributes/query_attributes';
 
-import { AlertSuppressionMissingFieldsStrategy } from '@kbn/security-solution-plugin/common/api/detection_engine';
 import { createRuleAssetSavedObject } from '../../../helpers/rules';
 import {
   getInstallSingleRuleButtonByRuleId,
   getUpgradeSingleRuleButtonByRuleId,
   GO_BACK_TO_RULES_TABLE_BUTTON,
   INSTALL_ALL_RULES_BUTTON,
-  INSTALL_PREBUILT_RULE_BUTTON,
-  INSTALL_PREBUILT_RULE_PREVIEW,
   INSTALL_SELECTED_RULES_BUTTON,
   NO_RULES_AVAILABLE_FOR_INSTALL_MESSAGE,
   NO_RULES_AVAILABLE_FOR_UPGRADE_MESSAGE,
@@ -30,8 +21,6 @@ import {
   RULE_CHECKBOX,
   SELECT_ALL_RULES_ON_PAGE_CHECKBOX,
   TOASTER,
-  UPDATE_PREBUILT_RULE_PREVIEW,
-  UPDATE_PREBUILT_RULE_BUTTON,
   UPGRADE_ALL_RULES_BUTTON,
   UPGRADE_SELECTED_RULES_BUTTON,
 } from '../../../screens/alerts_detection_rules';
@@ -42,44 +31,17 @@ import {
   installPrebuiltRuleAssets,
   createAndInstallMockedPrebuiltRules,
 } from '../../../tasks/api_calls/prebuilt_rules';
-import { createSavedQuery, deleteSavedQueries } from '../../../tasks/api_calls/saved_queries';
-import { fetchMachineLearningModules } from '../../../tasks/api_calls/machine_learning';
-import {
-  resetRulesTableState,
-  deleteAlertsAndRules,
-  postDataView,
-  deleteDataView,
-} from '../../../tasks/common';
+import { resetRulesTableState, deleteAlertsAndRules } from '../../../tasks/common';
 import { login } from '../../../tasks/login';
 import {
-  addElasticRulesButtonClick,
-  assertAlertSuppressionPropertiesDisplayed,
-  assertCommonPropertiesDisplayedCorrectly,
-  assertCustomQueryPropertyDisplayed,
-  assertDataViewPropertiesDisplayed,
-  assertEqlQueryPropertyDisplayed,
-  assertEsqlQueryPropertyDisplayed,
-  assertFiltersPropertyDisplayed,
-  assertIndexPropertyDisplayed,
+  clickAddElasticRulesButton,
   assertInstallationRequestIsComplete,
-  assertInstallationSuccess,
-  assertMachineLearningPropertiesDisplayed,
-  assertNewTermsFieldsPropertyDisplayed,
-  assertRuleInstallSuccessToastShown,
-  assertRuleNotPresentInAddPrebuiltRulesTable,
-  assertRuleNotPresentInRuleUpdatesTable,
-  assertRulePresentInInstalledRulesTable,
+  assertRuleInstallationSuccessToastShown,
+  assertRulesNotPresentInRuleUpdatesTable,
+  assertRulesPresentInInstalledRulesTable,
   assertRuleUpgradeSuccessToastShown,
-  assertSavedQueryPropertiesDisplayed,
-  assertThreatMatchQueryPropertiesDisplayed,
-  assertThresholdPropertyDisplayed,
   assertUpgradeRequestIsComplete,
-  assertUpgradeSuccess,
-  assertWindowSizePropertyDisplayed,
-  closeRulePreview,
-  openRuleInstallPreview,
-  openRuleUpdatePreview,
-  ruleUpdatesTabClick,
+  clickRuleUpdatesTab,
 } from '../../../tasks/prebuilt_rules';
 import { visitRulesManagementTable } from '../../../tasks/rules_management';
 
@@ -87,280 +49,6 @@ describe(
   'Detection rules, Prebuilt Rules Installation and Update workflow',
   { tags: ['@ess', '@serverless'] },
   () => {
-    const commonProperties: Partial<PrebuiltRuleAsset> = {
-      author: ['Elastic', 'Another author'],
-      building_block_type: 'default',
-      severity: 'medium',
-      severity_mapping: [
-        {
-          field: 'Ransomware.severity',
-          value: '50',
-          operator: 'equals',
-          severity: 'high',
-        },
-      ],
-      risk_score: 20,
-      risk_score_mapping: [
-        {
-          field: 'Ransomware.child_processes.score',
-          operator: 'equals',
-          risk_score: 30,
-          value: '',
-        },
-      ],
-      references: ['https://www.example.com/1', 'https://www.example.com/2'],
-      false_positives: ['False positive example 1', 'False positive example 2'],
-      investigation_fields: {
-        field_names: ['Ransomware.files.path', 'Target.dll.name'],
-      },
-      license: 'MIT',
-      rule_name_override: 'Endpoint.policy.applied.name',
-      threat: [
-        {
-          framework: 'MITRE ATT&CK',
-          tactic: {
-            id: 'TA0009',
-            reference: 'https://attack.mitre.org/tactics/TA0009',
-            name: 'Collection',
-          },
-          technique: [
-            {
-              id: 'T1557',
-              reference: 'https://attack.mitre.org/techniques/T1557',
-              name: 'Adversary-in-the-Middle',
-              subtechnique: [
-                {
-                  id: 'T1557.002',
-                  reference: 'https://attack.mitre.org/techniques/T1557/002',
-                  name: 'ARP Cache Poisoning',
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      timestamp_override: 'Target.process.start',
-      tags: ['tag-a', 'tag-b'],
-      related_integrations: [
-        { package: 'endpoint', version: '^8.2.0' },
-        { package: 'windows', version: '^1.5.0' },
-      ],
-      required_fields: [
-        { ecs: true, name: 'event.type', type: 'keyword' },
-        { ecs: true, name: 'file.extension', type: 'keyword' },
-      ],
-      timeline_id: '3e827bab-838a-469f-bd1e-5e19a2bff2fd',
-      timeline_title: 'Alerts Involving a Single User Timeline',
-      interval: '5m',
-      from: 'now-360s',
-      note: 'Investigation guide content',
-      setup: 'Setup guide content',
-    };
-
-    const filters = [
-      {
-        meta: {
-          disabled: false,
-          negate: false,
-          alias: null,
-          index: 'security-solution-default',
-          key: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-          field: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-          value: 'exists',
-          type: 'exists',
-        },
-        query: {
-          exists: {
-            field: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-          },
-        },
-        $state: { store: 'appState' },
-      },
-    ];
-
-    const queryProperties: Partial<PrebuiltRuleAsset> = {
-      query: '_id : *',
-      language: 'kuery',
-      filters,
-    };
-
-    const CUSTOM_QUERY_INDEX_PATTERN_RULE = createRuleAssetSavedObject({
-      name: 'Custom query index pattern rule',
-      rule_id: 'custom_query_index_pattern_rule',
-      ...(commonProperties as Record<string, unknown>),
-      type: 'query',
-      ...queryProperties,
-      index: ['winlogbeat-*', 'logs-endpoint.events.*'],
-      alert_suppression: {
-        group_by: [
-          'Endpoint.policy.applied.artifacts.global.identifiers.name',
-          'Endpoint.policy.applied.id',
-        ],
-        duration: { unit: 'm', value: 5 },
-        missing_fields_strategy: AlertSuppressionMissingFieldsStrategy.Suppress,
-      },
-    });
-
-    const SAVED_QUERY_DATA_VIEW_RULE = createRuleAssetSavedObject({
-      name: 'Custom query data view rule',
-      rule_id: 'custom_query_data_view_rule',
-      ...(commonProperties as Record<string, unknown>),
-      type: 'saved_query',
-      data_view_id: 'my-test-data-view-id',
-      saved_id: '',
-      language: 'kuery',
-      index: ['winlogbeat-*', 'logs-endpoint.events.*'],
-      alert_suppression: {
-        group_by: [
-          'Endpoint.policy.applied.artifacts.global.identifiers.name',
-          'Endpoint.policy.applied.id',
-        ],
-        duration: { unit: 'm', value: 5 },
-        missing_fields_strategy: AlertSuppressionMissingFieldsStrategy.Suppress,
-      },
-      query: '',
-    });
-
-    const MACHINE_LEARNING_RULE = omit(
-      createRuleAssetSavedObject({
-        name: 'Machine learning rule',
-        rule_id: 'machine_learning_rule',
-        ...commonProperties,
-        type: 'machine_learning',
-        anomaly_threshold: 65,
-        machine_learning_job_id: ['auth_high_count_logon_events', 'auth_high_count_logon_fails'],
-      }),
-      ['security-rule.query', 'security-rule.language']
-    ) as typeof CUSTOM_QUERY_INDEX_PATTERN_RULE;
-
-    const THRESHOLD_RULE_INDEX_PATTERN = createRuleAssetSavedObject({
-      name: 'Threshold index pattern rule',
-      rule_id: 'threshold_index_pattern_rule',
-      ...commonProperties,
-      type: 'threshold',
-      ...queryProperties,
-      language: 'lucene',
-      index: ['winlogbeat-*', 'logs-endpoint.events.*'],
-      threshold: {
-        field: [
-          'Endpoint.policy.applied.artifacts.user.identifiers.name',
-          'Endpoint.policy.applied.id',
-        ],
-        value: 200,
-        cardinality: [{ field: 'Ransomware.score', value: 3 }],
-      },
-    });
-
-    const EQL_INDEX_PATTERN_RULE = createRuleAssetSavedObject({
-      name: 'Event correlation index pattern rule',
-      rule_id: 'eql_index_pattern_rule',
-      ...commonProperties,
-      type: 'eql',
-      language: 'eql',
-      query: 'process where process.name == "regsvr32.exe"',
-      index: ['winlogbeat-*', 'logs-endpoint.events.*'],
-      filters,
-    });
-
-    const THREAT_MATCH_INDEX_PATTERN_RULE = createRuleAssetSavedObject({
-      name: 'Threat match index pattern rule',
-      rule_id: 'threat_match_index_pattern_rule',
-      ...commonProperties,
-      type: 'threat_match',
-      ...queryProperties,
-      language: 'lucene',
-      index: ['winlogbeat-*', 'logs-endpoint.events.*'],
-      filters,
-      threat_query: '@timestamp >= "now-30d/d"',
-      threat_mapping: [
-        {
-          entries: [
-            {
-              field: 'file.hash.md5',
-              type: 'mapping',
-              value: 'threat.indicator.file.hash.md5',
-            },
-          ],
-        },
-      ],
-      threat_index: ['filebeat-*', 'logs-ti_*'],
-      threat_filters: [
-        {
-          $state: { store: 'appState' },
-          meta: {
-            disabled: false,
-            key: 'event.category',
-            negate: false,
-            params: { query: 'threat' },
-            type: 'phrase',
-            alias: null,
-          },
-          query: { match_phrase: { 'event.category': 'threat' } },
-        },
-      ],
-      threat_language: 'kuery',
-      threat_indicator_path: 'threat.indicator',
-    });
-
-    const NEW_TERMS_INDEX_PATTERN_RULE = createRuleAssetSavedObject({
-      name: 'New terms index pattern rule',
-      rule_id: 'new_terms_index_pattern_rule',
-      ...commonProperties,
-      type: 'new_terms',
-      ...queryProperties,
-      query: '_id: *',
-      new_terms_fields: ['Endpoint.policy.applied.id', 'Memory_protection.unique_key_v1'],
-      history_window_start: 'now-9d',
-      index: ['apm-*-transaction*', 'auditbeat-*'],
-      language: 'lucene',
-      filters: [
-        {
-          meta: {
-            disabled: false,
-            negate: false,
-            alias: null,
-            index: 'security-solution-default',
-            key: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-            field: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-            value: 'exists',
-            type: 'exists',
-          },
-          query: {
-            exists: {
-              field: 'Endpoint.policy.applied.artifacts.global.identifiers.name',
-            },
-          },
-          $state: { store: 'appState' },
-        },
-      ],
-    });
-
-    const ESQL_RULE = createRuleAssetSavedObject({
-      name: 'ESQL rule',
-      rule_id: 'esql_rule',
-      ...commonProperties,
-      type: 'esql',
-      language: 'esql',
-      query: 'FROM .alerts-security.alerts-default | STATS count = COUNT(@timestamp) BY @timestamp',
-    });
-
-    const RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES = createRuleAssetSavedObject({
-      name: 'Rule with hidden tabs and sections',
-      rule_id: 'rule_without_investigation_and_setup_guides',
-    });
-
-    const testDataView = {
-      indexPattern: 'test-*',
-      name: 'My test data view',
-      id: 'my-test-data-view-id',
-    };
-
-    const testSavedQuery = {
-      query: 'agent.id: *',
-      name: 'My test saved query',
-      filterKey: 'agent.hostname',
-    };
-
     beforeEach(() => {
       login();
       resetRulesTableState();
@@ -433,7 +121,7 @@ describe(
             );
 
             const numberOfRulesToInstall = new Set(ruleIds).size;
-            addElasticRulesButtonClick();
+            clickAddElasticRulesButton();
 
             cy.get(INSTALL_ALL_RULES_BUTTON).should('be.enabled').click();
             cy.wait('@installPrebuiltRules', {
@@ -490,278 +178,42 @@ describe(
       });
 
       it('should install prebuilt rules one by one', () => {
-        addElasticRulesButtonClick();
+        clickAddElasticRulesButton();
 
         // Attempt to install rules
         cy.get(getInstallSingleRuleButtonByRuleId(RULE_1['security-rule'].rule_id)).click();
         // Wait for request to complete
         assertInstallationRequestIsComplete([RULE_1]);
         // Assert installation succeeded
-        assertInstallationSuccess([RULE_1]);
-      });
-
-      it('User can preview a rule before installing', () => {
-        addElasticRulesButtonClick();
-
-        openRuleInstallPreview(RULE_1['security-rule'].name);
-        closeRulePreview();
-
-        openRuleInstallPreview(RULE_2['security-rule'].name);
-        cy.get(INSTALL_PREBUILT_RULE_BUTTON).click();
-        cy.wait('@installPrebuiltRules');
-        assertRuleInstallSuccessToastShown([RULE_2]);
+        assertRuleInstallationSuccessToastShown([RULE_1]);
+        // Go back to rules table and assert that the rules are installed
         cy.get(RULE_MANAGEMENT_PAGE_BREADCRUMB).click();
-        assertRulePresentInInstalledRulesTable(RULE_2['security-rule'].name);
-
-        addElasticRulesButtonClick();
-        assertRuleNotPresentInAddPrebuiltRulesTable(RULE_2['security-rule'].name);
-      });
-
-      describe('User can see correct rule information in preview before installing', () => {
-        beforeEach(() => {
-          deleteDataView(testDataView.id);
-          postDataView(testDataView.indexPattern, testDataView.name, testDataView.id);
-
-          deleteSavedQueries();
-          createSavedQuery(testSavedQuery.name, testSavedQuery.query, testSavedQuery.filterKey)
-            .its('body.id')
-            .then((id: string) => {
-              (SAVED_QUERY_DATA_VIEW_RULE['security-rule'] as { saved_id: string }).saved_id = id;
-
-              installPrebuiltRuleAssets([
-                CUSTOM_QUERY_INDEX_PATTERN_RULE,
-                SAVED_QUERY_DATA_VIEW_RULE,
-                MACHINE_LEARNING_RULE,
-                THRESHOLD_RULE_INDEX_PATTERN,
-                EQL_INDEX_PATTERN_RULE,
-                THREAT_MATCH_INDEX_PATTERN_RULE,
-                NEW_TERMS_INDEX_PATTERN_RULE,
-                ESQL_RULE,
-                RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES,
-              ]);
-            });
-
-          fetchMachineLearningModules()
-            .its('body')
-            .then((mlModules) => {
-              cy.wrap(mlModules).as('mlModules');
-            });
-        });
-
-        it('Custom query rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { index } = CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'] as { index: string[] };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'] as { query: string };
-          assertCustomQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { alert_suppression: alertSuppression } = CUSTOM_QUERY_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { alert_suppression: AlertSuppression };
-          assertAlertSuppressionPropertiesDisplayed(alertSuppression);
-
-          closeRulePreview();
-
-          openRuleInstallPreview(SAVED_QUERY_DATA_VIEW_RULE['security-rule'].name);
-
-          const { data_view_id: dataViewId } = SAVED_QUERY_DATA_VIEW_RULE['security-rule'] as {
-            data_view_id: string;
-          };
-          assertDataViewPropertiesDisplayed(dataViewId, testDataView.indexPattern);
-
-          assertSavedQueryPropertiesDisplayed(
-            testSavedQuery.query,
-            testSavedQuery.filterKey,
-            testSavedQuery.name
-          );
-        });
-
-        it('Machine learning rule properties', function () {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(MACHINE_LEARNING_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const {
-            anomaly_threshold: anomalyThreshold,
-            machine_learning_job_id: machineLearningJobIds,
-          } = MACHINE_LEARNING_RULE['security-rule'] as {
-            anomaly_threshold: number;
-            machine_learning_job_id: string[];
-          };
-          assertMachineLearningPropertiesDisplayed(
-            anomalyThreshold,
-            machineLearningJobIds,
-            this.mlModules
-          );
-        });
-
-        it('Threshold rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(THRESHOLD_RULE_INDEX_PATTERN['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { threshold } = THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as {
-            threshold: Threshold;
-          };
-          assertThresholdPropertyDisplayed(threshold.value);
-
-          const { index } = THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as { index: string[] };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as { query: string };
-          assertCustomQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-        });
-
-        it('EQL rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(EQL_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { query } = EQL_INDEX_PATTERN_RULE['security-rule'] as { query: string };
-          assertEqlQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = EQL_INDEX_PATTERN_RULE['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-        });
-
-        it('Indicator match rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const {
-            threat_index: threatIndex,
-            threat_mapping: threatMapping,
-            threat_filters: threatFilters,
-            threat_query: threatQuery,
-          } = THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as {
-            threat_index: string[];
-            threat_mapping: ThreatMapping;
-            threat_filters: Filter[];
-            threat_query: string;
-          };
-          assertThreatMatchQueryPropertiesDisplayed({
-            threatIndex,
-            threatMapping,
-            threatFilters,
-            threatQuery,
-          });
-
-          const { filters: queryFilters } = THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { index } = THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as { index: string[] };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as { query: string };
-          assertCustomQueryPropertyDisplayed(query);
-        });
-
-        it('New terms rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(NEW_TERMS_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { new_terms_fields: newTermsFields } = NEW_TERMS_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { new_terms_fields: string[] };
-          assertNewTermsFieldsPropertyDisplayed(newTermsFields);
-
-          const { history_window_start: historyWindowStart } = NEW_TERMS_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { history_window_start: string };
-          assertWindowSizePropertyDisplayed(historyWindowStart);
-
-          const { filters: queryFilters } = NEW_TERMS_INDEX_PATTERN_RULE['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { index } = NEW_TERMS_INDEX_PATTERN_RULE['security-rule'] as { index: string[] };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = NEW_TERMS_INDEX_PATTERN_RULE['security-rule'] as { query: string };
-          assertCustomQueryPropertyDisplayed(query);
-        });
-
-        it('ESQL rule properties', () => {
-          addElasticRulesButtonClick();
-
-          openRuleInstallPreview(ESQL_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { query } = ESQL_RULE['security-rule'] as { query: string };
-          assertEsqlQueryPropertyDisplayed(query);
-        });
-      });
-
-      it('Tabs and sections without content should be hidden in preview before installing', () => {
-        installPrebuiltRuleAssets([RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES]);
-
-        addElasticRulesButtonClick();
-
-        openRuleInstallPreview(RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES['security-rule'].name);
-
-        cy.get(INSTALL_PREBUILT_RULE_PREVIEW).contains('Investigation guide').should('not.exist');
-        cy.get(INSTALL_PREBUILT_RULE_PREVIEW).contains('Setup guide').should('not.exist');
-      });
-
-      it('should install multiple selected prebuilt rules by selecting them individually', () => {
-        addElasticRulesButtonClick();
-        selectRulesByName([RULE_1['security-rule'].name, RULE_2['security-rule'].name]);
-        cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
-        assertInstallationRequestIsComplete([RULE_1, RULE_2]);
-        assertInstallationSuccess([RULE_1, RULE_2]);
+        assertRulesPresentInInstalledRulesTable([RULE_1]);
       });
 
       it('should install multiple selected prebuilt rules by selecting all in page', () => {
-        addElasticRulesButtonClick();
+        clickAddElasticRulesButton();
         cy.get(SELECT_ALL_RULES_ON_PAGE_CHECKBOX).click();
         cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
         assertInstallationRequestIsComplete([RULE_1, RULE_2]);
-        assertInstallationSuccess([RULE_1, RULE_2]);
+        assertRuleInstallationSuccessToastShown([RULE_1, RULE_2]);
+        // Go back to rules table and assert that the rules are installed
+        cy.get(RULE_MANAGEMENT_PAGE_BREADCRUMB).click();
+        assertRulesPresentInInstalledRulesTable([RULE_1, RULE_2]);
       });
 
       it('should install all available rules at once', () => {
-        addElasticRulesButtonClick();
+        clickAddElasticRulesButton();
         cy.get(INSTALL_ALL_RULES_BUTTON).click();
         assertInstallationRequestIsComplete([RULE_1, RULE_2]);
-        assertInstallationSuccess([RULE_1, RULE_2]);
+        assertRuleInstallationSuccessToastShown([RULE_1, RULE_2]);
+        // Go back to rules table and assert that the rules are installed
+        cy.get(RULE_MANAGEMENT_PAGE_BREADCRUMB).click();
+        assertRulesPresentInInstalledRulesTable([RULE_1, RULE_2]);
       });
 
       it('should display an empty screen when all available prebuilt rules have been installed', () => {
-        addElasticRulesButtonClick();
+        clickAddElasticRulesButton();
         cy.get(INSTALL_ALL_RULES_BUTTON).click();
         cy.get(TOASTER).should('be.visible').should('have.text', `2 rules installed successfully.`);
         cy.get(RULE_CHECKBOX).should('not.exist');
@@ -803,7 +255,7 @@ describe(
         installPrebuiltRuleAssets([UPDATED_RULE_1, UPDATED_RULE_2]);
 
         visitRulesManagementTable();
-        ruleUpdatesTabClick();
+        clickRuleUpdatesTab();
       });
 
       it('should upgrade prebuilt rules one by one', () => {
@@ -814,376 +266,8 @@ describe(
         // Wait for request to complete
         assertUpgradeRequestIsComplete([OUTDATED_RULE_1]);
 
-        assertUpgradeSuccess([OUTDATED_RULE_1]);
-      });
-
-      it('User can preview a rule before upgrading', () => {
-        ruleUpdatesTabClick();
-
-        openRuleUpdatePreview(OUTDATED_RULE_1['security-rule'].name);
-        closeRulePreview();
-
-        openRuleUpdatePreview(OUTDATED_RULE_1['security-rule'].name);
-        cy.get(UPDATE_PREBUILT_RULE_BUTTON).click();
-        cy.wait('@updatePrebuiltRules');
-
         assertRuleUpgradeSuccessToastShown([OUTDATED_RULE_1]);
-        cy.get(RULE_MANAGEMENT_PAGE_BREADCRUMB).click();
-
-        assertRuleNotPresentInRuleUpdatesTable(OUTDATED_RULE_1['security-rule'].name);
-      });
-
-      describe('User can see correct rule information in preview before upgrading', () => {
-        const UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE = {
-          ...CUSTOM_QUERY_INDEX_PATTERN_RULE,
-          ['security-rule']: {
-            ...CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'],
-            query: '_id : * and event.type: start',
-            version: 2,
-          },
-        };
-
-        const UPDATED_SAVED_QUERY_DATA_VIEW_RULE = {
-          ...SAVED_QUERY_DATA_VIEW_RULE,
-          ['security-rule']: {
-            ...SAVED_QUERY_DATA_VIEW_RULE['security-rule'],
-            alert_suppression: {
-              group_by: ['Endpoint.policy.applied.id'],
-              duration: { unit: 'm', value: 10 },
-              missing_fields_strategy: AlertSuppressionMissingFieldsStrategy.Suppress,
-            },
-            version: 2,
-          },
-        } as typeof SAVED_QUERY_DATA_VIEW_RULE;
-
-        const UPDATED_MACHINE_LEARNING_RULE = {
-          ...MACHINE_LEARNING_RULE,
-          ['security-rule']: {
-            ...MACHINE_LEARNING_RULE['security-rule'],
-            anomaly_threshold: 99,
-            version: 2,
-          },
-        };
-
-        const UPDATED_THRESHOLD_RULE_INDEX_PATTERN = {
-          ...THRESHOLD_RULE_INDEX_PATTERN,
-          ['security-rule']: {
-            ...THRESHOLD_RULE_INDEX_PATTERN['security-rule'],
-            threshold: {
-              field: ['Endpoint.policy.applied.artifacts.user.identifiers.name'],
-              value: 999,
-              cardinality: [{ field: 'Ransomware.score', value: 10 }],
-            },
-            version: 2,
-          },
-        };
-
-        const UPDATED_EQL_INDEX_PATTERN_RULE = {
-          ...EQL_INDEX_PATTERN_RULE,
-          ['security-rule']: {
-            ...EQL_INDEX_PATTERN_RULE['security-rule'],
-            query: 'process where process.name == "regsvr32.exe" and process.pid == 1234',
-            version: 2,
-          },
-        };
-
-        const UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE = {
-          ...THREAT_MATCH_INDEX_PATTERN_RULE,
-          ['security-rule']: {
-            ...THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'],
-            threat_query: '@timestamp >= "now-60d/d"',
-            version: 2,
-          },
-        };
-
-        const UPDATED_NEW_TERMS_INDEX_PATTERN_RULE = {
-          ...NEW_TERMS_INDEX_PATTERN_RULE,
-          ['security-rule']: {
-            ...NEW_TERMS_INDEX_PATTERN_RULE['security-rule'],
-            new_terms_fields: ['Endpoint.policy.applied.id', 'Memory_protection.unique_key_v2'],
-            history_window_start: 'now-10d',
-            version: 2,
-          },
-        };
-
-        const UPDATED_ESQL_RULE = {
-          ...ESQL_RULE,
-          ['security-rule']: {
-            ...ESQL_RULE['security-rule'],
-            query:
-              'FROM .alerts-security.alerts-default | STATS count = COUNT(@timestamp) BY @timestamp, event.category',
-            version: 2,
-          },
-        };
-
-        beforeEach(() => {
-          deleteDataView(testDataView.id);
-          postDataView(testDataView.indexPattern, testDataView.name, testDataView.id);
-
-          deleteSavedQueries();
-          createSavedQuery(testSavedQuery.name, testSavedQuery.query, testSavedQuery.filterKey)
-            .its('body.id')
-            .then((id: string) => {
-              (
-                UPDATED_SAVED_QUERY_DATA_VIEW_RULE['security-rule'] as { saved_id: string }
-              ).saved_id = id;
-
-              createAndInstallMockedPrebuiltRules([
-                CUSTOM_QUERY_INDEX_PATTERN_RULE,
-                SAVED_QUERY_DATA_VIEW_RULE,
-                MACHINE_LEARNING_RULE,
-                THRESHOLD_RULE_INDEX_PATTERN,
-                EQL_INDEX_PATTERN_RULE,
-                THREAT_MATCH_INDEX_PATTERN_RULE,
-                NEW_TERMS_INDEX_PATTERN_RULE,
-                ESQL_RULE,
-              ]);
-
-              installPrebuiltRuleAssets([
-                UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE,
-                UPDATED_SAVED_QUERY_DATA_VIEW_RULE,
-                UPDATED_MACHINE_LEARNING_RULE,
-                UPDATED_THRESHOLD_RULE_INDEX_PATTERN,
-                UPDATED_EQL_INDEX_PATTERN_RULE,
-                UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE,
-                UPDATED_NEW_TERMS_INDEX_PATTERN_RULE,
-                UPDATED_ESQL_RULE,
-              ]);
-
-              cy.reload();
-            });
-
-          fetchMachineLearningModules()
-            .its('body')
-            .then((mlModules) => {
-              cy.wrap(mlModules).as('mlModules');
-            });
-        });
-
-        it('Custom query rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'].name);
-
-          const { index } = UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'] as {
-            index: string[];
-          };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE['security-rule'] as {
-            query: string;
-          };
-          assertCustomQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { alert_suppression: alertSuppression } = UPDATED_CUSTOM_QUERY_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { alert_suppression: AlertSuppression };
-          assertAlertSuppressionPropertiesDisplayed(alertSuppression);
-
-          closeRulePreview();
-
-          openRuleUpdatePreview(UPDATED_SAVED_QUERY_DATA_VIEW_RULE['security-rule'].name);
-
-          const { data_view_id: dataViewId } = UPDATED_SAVED_QUERY_DATA_VIEW_RULE[
-            'security-rule'
-          ] as {
-            data_view_id: string;
-          };
-          assertDataViewPropertiesDisplayed(dataViewId, testDataView.indexPattern);
-
-          assertSavedQueryPropertiesDisplayed(
-            testSavedQuery.query,
-            testSavedQuery.filterKey,
-            testSavedQuery.name
-          );
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-        });
-
-        it('Machine learning rule properties', function () {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_MACHINE_LEARNING_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const {
-            anomaly_threshold: anomalyThreshold,
-            machine_learning_job_id: machineLearningJobIds,
-          } = UPDATED_MACHINE_LEARNING_RULE['security-rule'] as {
-            anomaly_threshold: number;
-            machine_learning_job_id: string[];
-          };
-          assertMachineLearningPropertiesDisplayed(
-            anomalyThreshold,
-            machineLearningJobIds,
-            this.mlModules
-          );
-        });
-
-        it('Threshold rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_THRESHOLD_RULE_INDEX_PATTERN['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { threshold } = UPDATED_THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as {
-            threshold: Threshold;
-          };
-          assertThresholdPropertyDisplayed(threshold.value);
-
-          const { index } = UPDATED_THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as {
-            index: string[];
-          };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = UPDATED_THRESHOLD_RULE_INDEX_PATTERN['security-rule'] as {
-            query: string;
-          };
-          assertCustomQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = UPDATED_THRESHOLD_RULE_INDEX_PATTERN[
-            'security-rule'
-          ] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-        });
-
-        it('EQL rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_EQL_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { query } = UPDATED_EQL_INDEX_PATTERN_RULE['security-rule'] as { query: string };
-          assertEqlQueryPropertyDisplayed(query);
-
-          const { filters: queryFilters } = UPDATED_EQL_INDEX_PATTERN_RULE['security-rule'] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-        });
-
-        it('Indicator match rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const {
-            threat_index: threatIndex,
-            threat_mapping: threatMapping,
-            threat_filters: threatFilters,
-            threat_query: threatQuery,
-          } = UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as {
-            threat_index: string[];
-            threat_mapping: ThreatMapping;
-            threat_filters: Filter[];
-            threat_query: string;
-          };
-          assertThreatMatchQueryPropertiesDisplayed({
-            threatIndex,
-            threatMapping,
-            threatFilters,
-            threatQuery,
-          });
-
-          const { filters: queryFilters } = UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { index } = UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as {
-            index: string[];
-          };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = UPDATED_THREAT_MATCH_INDEX_PATTERN_RULE['security-rule'] as {
-            query: string;
-          };
-          assertCustomQueryPropertyDisplayed(query);
-        });
-
-        it('New terms rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_NEW_TERMS_INDEX_PATTERN_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { new_terms_fields: newTermsFields } = UPDATED_NEW_TERMS_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { new_terms_fields: string[] };
-          assertNewTermsFieldsPropertyDisplayed(newTermsFields);
-
-          const { history_window_start: historyWindowStart } = UPDATED_NEW_TERMS_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as { history_window_start: string };
-          assertWindowSizePropertyDisplayed(historyWindowStart);
-
-          const { filters: queryFilters } = UPDATED_NEW_TERMS_INDEX_PATTERN_RULE[
-            'security-rule'
-          ] as {
-            filters: Filter[];
-          };
-          assertFiltersPropertyDisplayed(queryFilters);
-
-          const { index } = UPDATED_NEW_TERMS_INDEX_PATTERN_RULE['security-rule'] as {
-            index: string[];
-          };
-          assertIndexPropertyDisplayed(index);
-
-          const { query } = UPDATED_NEW_TERMS_INDEX_PATTERN_RULE['security-rule'] as {
-            query: string;
-          };
-          assertCustomQueryPropertyDisplayed(query);
-        });
-
-        it('ESQL rule properties', () => {
-          ruleUpdatesTabClick();
-
-          openRuleUpdatePreview(UPDATED_ESQL_RULE['security-rule'].name);
-
-          assertCommonPropertiesDisplayedCorrectly(commonProperties);
-
-          const { query } = UPDATED_ESQL_RULE['security-rule'] as { query: string };
-          assertEsqlQueryPropertyDisplayed(query);
-        });
-      });
-
-      it('Tabs and sections without content should be hidden in preview before upgrading', () => {
-        const UPDATED_RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES = {
-          ...RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES,
-          ['security-rule']: {
-            ...RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES['security-rule'],
-            version: 2,
-          },
-        };
-
-        createAndInstallMockedPrebuiltRules([RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES]);
-
-        installPrebuiltRuleAssets([UPDATED_RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES]);
-
-        ruleUpdatesTabClick();
-
-        openRuleUpdatePreview(
-          UPDATED_RULE_WITHOUT_INVESTIGATION_AND_SETUP_GUIDES['security-rule'].name
-        );
-        cy.get(UPDATE_PREBUILT_RULE_PREVIEW).contains('Investigation guide').should('not.exist');
-        cy.get(UPDATE_PREBUILT_RULE_PREVIEW).contains('Setup guide').should('not.exist');
+        assertRulesNotPresentInRuleUpdatesTable([OUTDATED_RULE_1]);
       });
 
       it('should upgrade multiple selected prebuilt rules by selecting them individually', () => {
@@ -1193,20 +277,24 @@ describe(
         ]);
         cy.get(UPGRADE_SELECTED_RULES_BUTTON).click();
         assertUpgradeRequestIsComplete([OUTDATED_RULE_1, OUTDATED_RULE_2]);
-        assertUpgradeSuccess([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+        assertRuleUpgradeSuccessToastShown([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+        assertRulesNotPresentInRuleUpdatesTable([OUTDATED_RULE_1, OUTDATED_RULE_2]);
       });
 
       it('should upgrade multiple selected prebuilt rules by selecting all in page', () => {
         cy.get(SELECT_ALL_RULES_ON_PAGE_CHECKBOX).click();
         cy.get(UPGRADE_SELECTED_RULES_BUTTON).click();
         assertUpgradeRequestIsComplete([OUTDATED_RULE_1, OUTDATED_RULE_2]);
-        assertUpgradeSuccess([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+        assertRuleUpgradeSuccessToastShown([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+        assertRulesNotPresentInRuleUpdatesTable([OUTDATED_RULE_1, OUTDATED_RULE_2]);
       });
 
       it('should upgrade all rules with available upgrades at once', () => {
         cy.get(UPGRADE_ALL_RULES_BUTTON).click();
         assertUpgradeRequestIsComplete([OUTDATED_RULE_1, OUTDATED_RULE_2]);
-        assertUpgradeSuccess([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+
+        assertRuleUpgradeSuccessToastShown([OUTDATED_RULE_1, OUTDATED_RULE_2]);
+        assertRulesNotPresentInRuleUpdatesTable([OUTDATED_RULE_1, OUTDATED_RULE_2]);
       });
 
       it('should display an empty screen when all rules with available updates have been upgraded', () => {
