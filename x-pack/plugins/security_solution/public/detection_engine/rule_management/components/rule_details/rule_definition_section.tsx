@@ -76,10 +76,10 @@ interface FiltersProps {
   filters: Filter[];
   dataViewId?: string;
   index?: string[];
-  dataTestSubj?: string;
+  'data-test-subj'?: string;
 }
 
-const Filters = ({ filters, dataViewId, index, dataTestSubj = 'filters' }: FiltersProps) => {
+const Filters = ({ filters, dataViewId, index, 'data-test-subj': dataTestSubj }: FiltersProps) => {
   const { indexPattern } = useRuleIndexPattern({
     dataSourceType: dataViewId ? DataSourceType.DataView : DataSourceType.IndexPatterns,
     index: index ?? [],
@@ -89,13 +89,13 @@ const Filters = ({ filters, dataViewId, index, dataTestSubj = 'filters' }: Filte
   const flattenedFilters = mapAndFlattenFilters(filters);
 
   return (
-    <EuiFlexGroup wrap responsive={false} gutterSize="xs">
+    <EuiFlexGroup wrap responsive={false} gutterSize="xs" data-test-subj={dataTestSubj}>
       {flattenedFilters.map((filter, idx) => (
         <EuiFlexItem
           grow={false}
           key={`filter-${idx}`}
           css={{ width: '100%' }}
-          data-test-subj={`${dataTestSubj}-${filter.meta.key}`}
+          data-test-subj={`filterItem-${filter.meta.key}`}
         >
           <EuiBadgeWrap color="hollow">
             {indexPattern != null ? (
@@ -116,10 +116,10 @@ const QueryContent = styled.div`
 
 interface QueryProps {
   query: string;
-  dataTestSubj?: string;
+  'data-test-subj'?: string;
 }
 
-const Query = ({ query, dataTestSubj = 'query' }: QueryProps) => (
+const Query = ({ query, 'data-test-subj': dataTestSubj = 'query' }: QueryProps) => (
   <QueryContent data-test-subj={dataTestSubj}>{query}</QueryContent>
 );
 
@@ -128,7 +128,7 @@ interface IndexProps {
 }
 
 const Index = ({ index }: IndexProps) => (
-  <BadgeList badges={index} dataTestSubj="indexPropertyValue" />
+  <BadgeList badges={index} data-test-subj="indexPropertyValue" />
 );
 
 interface DataViewIdProps {
@@ -309,7 +309,7 @@ interface ThreatIndexProps {
 }
 
 const ThreatIndex = ({ threatIndex }: ThreatIndexProps) => (
-  <BadgeList badges={threatIndex} dataTestSubj="threatIndexPropertyValue" />
+  <BadgeList badges={threatIndex} data-test-subj="threatIndexPropertyValue" />
 );
 
 interface ThreatMappingProps {
@@ -365,7 +365,7 @@ interface SuppressAlertsByFieldProps {
 }
 
 const SuppressAlertsByField = ({ fields }: SuppressAlertsByFieldProps) => (
-  <BadgeList badges={fields} dataTestSubj="alertSuppressionGroupByPropertyValue" />
+  <BadgeList badges={fields} data-test-subj="alertSuppressionGroupByPropertyValue" />
 );
 
 interface SuppressAlertsDurationProps {
@@ -406,7 +406,7 @@ interface NewTermsFieldsProps {
 }
 
 const NewTermsFields = ({ newTermsFields }: NewTermsFieldsProps) => (
-  <BadgeList badges={newTermsFields} dataTestSubj="newTermsFieldsPropertyValue" />
+  <BadgeList badges={newTermsFields} data-test-subj="newTermsFieldsPropertyValue" />
 );
 
 interface HistoryWindowSizeProps {
@@ -477,7 +477,7 @@ const prepareDefinitionSectionListItems = (
         description: (
           <Filters
             filters={savedQuery.attributes.filters as Filter[]}
-            dataTestSubj="savedQueryFiltersPropertyValue"
+            data-test-subj="savedQueryFiltersPropertyValue"
           />
         ),
       });
@@ -493,7 +493,7 @@ const prepareDefinitionSectionListItems = (
         description: (
           <Query
             query={savedQuery.attributes.query.query}
-            dataTestSubj="savedQueryContentPropertyValue"
+            data-test-subj="savedQueryContentPropertyValue"
           />
         ),
       });
@@ -508,7 +508,7 @@ const prepareDefinitionSectionListItems = (
           filters={rule.filters as Filter[]}
           dataViewId={rule.data_view_id}
           index={rule.index}
-          dataTestSubj="filtersPropertyValue"
+          data-test-subj="filtersPropertyValue"
         />
       ),
     });
@@ -520,7 +520,7 @@ const prepareDefinitionSectionListItems = (
         title: (
           <span data-test-subj="eqlQueryPropertyTitle">{descriptionStepI18n.EQL_QUERY_LABEL}</span>
         ),
-        description: <Query query={rule.query} dataTestSubj="eqlQueryPropertyValue" />,
+        description: <Query query={rule.query} data-test-subj="eqlQueryPropertyValue" />,
       });
     } else if (rule.type === 'esql') {
       definitionSectionListItems.push({
@@ -529,14 +529,14 @@ const prepareDefinitionSectionListItems = (
             {descriptionStepI18n.ESQL_QUERY_LABEL}
           </span>
         ),
-        description: <Query query={rule.query} dataTestSubj="esqlQueryPropertyValue" />,
+        description: <Query query={rule.query} data-test-subj="esqlQueryPropertyValue" />,
       });
     } else {
       definitionSectionListItems.push({
         title: (
           <span data-test-subj="customQueryPropertyTitle">{descriptionStepI18n.QUERY_LABEL}</span>
         ),
-        description: <Query query={rule.query} dataTestSubj="customQueryPropertyValue" />,
+        description: <Query query={rule.query} data-test-subj="customQueryPropertyValue" />,
       });
     }
   }
@@ -640,7 +640,7 @@ const prepareDefinitionSectionListItems = (
           filters={rule.threat_filters as Filter[]}
           dataViewId={rule.data_view_id}
           index={rule.index}
-          dataTestSubj="threatFiltersPropertyValue"
+          data-test-subj="threatFiltersPropertyValue"
         />
       ),
     });
@@ -653,7 +653,7 @@ const prepareDefinitionSectionListItems = (
           {descriptionStepI18n.THREAT_QUERY_LABEL}
         </span>
       ),
-      description: <Query query={rule.threat_query} dataTestSubj="threatQueryPropertyValue" />,
+      description: <Query query={rule.threat_query} data-test-subj="threatQueryPropertyValue" />,
     });
   }
 

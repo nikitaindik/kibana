@@ -72,7 +72,7 @@ interface AuthorProps {
 }
 
 const Author = ({ author }: AuthorProps) => (
-  <BadgeList badges={author} dataTestSubj="authorPropertyValue" />
+  <BadgeList badges={author} data-test-subj="authorPropertyValue" />
 );
 
 const BuildingBlock = () => (
@@ -109,7 +109,10 @@ const SeverityMappingItem = ({ severityMappingItem }: SeverityMappingItemProps) 
       <EuiIcon type={'sortRight'} />
     </EuiFlexItem>
     <EuiFlexItem>
-      <SeverityBadge dataTestSubj="severityOverrideSeverity" value={severityMappingItem.severity} />
+      <SeverityBadge
+        data-test-subj="severityOverrideSeverity"
+        value={severityMappingItem.severity}
+      />
     </EuiFlexItem>
   </EuiFlexGroup>
 );
@@ -187,7 +190,7 @@ interface InvestigationFieldsProps {
 }
 
 const InvestigationFields = ({ investigationFields }: InvestigationFieldsProps) => (
-  <BadgeList badges={investigationFields} dataTestSubj="investigationFieldsPropertyValue" />
+  <BadgeList badges={investigationFields} data-test-subj="investigationFieldsPropertyValue" />
 );
 
 interface LicenseProps {
@@ -215,7 +218,7 @@ interface ThreatProps {
 }
 
 const Threat = ({ threat }: ThreatProps) => (
-  <ThreatEuiFlexGroup threat={filterEmptyThreats(threat)} dataTestSubj="threatPropertyValue" />
+  <ThreatEuiFlexGroup threat={filterEmptyThreats(threat)} data-test-subj="threatPropertyValue" />
 );
 
 interface ThreatIndicatorPathProps {
@@ -240,7 +243,9 @@ interface TagsProps {
   tags: string[];
 }
 
-const Tags = ({ tags }: TagsProps) => <BadgeList badges={tags} dataTestSubj="tagsPropertyValue" />;
+const Tags = ({ tags }: TagsProps) => (
+  <BadgeList badges={tags} data-test-subj="tagsPropertyValue" />
+);
 
 // eslint-disable-next-line complexity
 const prepareAboutSectionListItems = (
@@ -283,7 +288,7 @@ const prepareAboutSectionListItems = (
   if (rule.severity) {
     aboutSectionListItems.push({
       title: <span data-test-subj="severityPropertyTitle">{i18n.SEVERITY_FIELD_LABEL}</span>,
-      description: <SeverityBadge value={rule.severity} dataTestSubj="severityPropertyValue" />,
+      description: <SeverityBadge value={rule.severity} data-test-subj="severityPropertyValue" />,
     });
   }
 

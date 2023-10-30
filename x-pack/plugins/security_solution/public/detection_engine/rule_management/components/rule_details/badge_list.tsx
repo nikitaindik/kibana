@@ -17,10 +17,10 @@ const StyledEuiBadge = styled(EuiBadge)`
 
 interface BadgeListProps {
   badges: string[];
-  dataTestSubj?: string;
+  'data-test-subj'?: string;
 }
 
-export const BadgeList = ({ badges, dataTestSubj = 'badgeList' }: BadgeListProps) => (
+export const BadgeList = ({ badges, 'data-test-subj': dataTestSubj }: BadgeListProps) => (
   <EuiFlexGroup responsive={false} gutterSize="xs" wrap data-test-subj={dataTestSubj}>
     {badges.map((badge: string) => (
       <EuiFlexItem grow={false} key={`badge-${badge}`} data-test-subj={`${dataTestSubj}Item`}>

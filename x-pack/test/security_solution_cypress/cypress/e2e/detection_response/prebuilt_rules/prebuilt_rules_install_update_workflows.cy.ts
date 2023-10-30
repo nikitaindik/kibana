@@ -190,6 +190,17 @@ describe(
         assertRulesPresentInInstalledRulesTable([RULE_1]);
       });
 
+      it('should install multiple selected prebuilt rules by selecting them individually', () => {
+        clickAddElasticRulesButton();
+        selectRulesByName([RULE_1['security-rule'].name, RULE_2['security-rule'].name]);
+        cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
+        assertInstallationRequestIsComplete([RULE_1, RULE_2]);
+        assertRuleInstallationSuccessToastShown([RULE_1, RULE_2]);
+        // Go back to rules table and assert that the rules are installed
+        cy.get(RULE_MANAGEMENT_PAGE_BREADCRUMB).click();
+        assertRulesPresentInInstalledRulesTable([RULE_1, RULE_2]);
+      });
+
       it('should install multiple selected prebuilt rules by selecting all in page', () => {
         cy.get(SELECT_ALL_RULES_ON_PAGE_CHECKBOX).click();
         cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
