@@ -191,7 +191,6 @@ describe(
       });
 
       it('should install multiple selected prebuilt rules by selecting them individually', () => {
-        clickAddElasticRulesButton();
         selectRulesByName([RULE_1['security-rule'].name, RULE_2['security-rule'].name]);
         cy.get(INSTALL_SELECTED_RULES_BUTTON).click();
         assertInstallationRequestIsComplete([RULE_1, RULE_2]);
