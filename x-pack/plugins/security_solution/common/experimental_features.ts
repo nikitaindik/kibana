@@ -131,6 +131,13 @@ export const allowedExperimentalValues = Object.freeze({
    * Enables experimental Entity Analytics Asset Criticality feature
    */
   entityAnalyticsAssetCriticalityEnabled: false,
+
+  /*
+   * Enables experimental "Updates" tab in the prebuilt rule upgrade flyout.
+   * This tab shows the JSON diff between the installed prebuilt rule
+   * version and the latest available version.
+   */
+  jsonPrebuiltRulesDiffingEnabled: false,
 });
 
 type ExperimentalConfigKeys = Array<keyof ExperimentalFeatures>;

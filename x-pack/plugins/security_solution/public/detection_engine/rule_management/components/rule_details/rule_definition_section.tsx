@@ -53,7 +53,7 @@ import { useSecurityJobs } from '../../../../common/components/ml_popover/hooks/
 import { useKibana } from '../../../../common/lib/kibana/kibana_react';
 import { TechnicalPreviewBadge } from '../../../../detections/components/rules/technical_preview_badge';
 import { BadgeList } from './badge_list';
-import { DESCRIPTION_LIST_COLUMN_WIDTHS } from './constants';
+import { DEFAULT_DESCRIPTION_LIST_COLUMN_WIDTHS } from './constants';
 import * as i18n from './translations';
 
 interface SavedQueryNameProps {
@@ -718,6 +718,7 @@ const prepareDefinitionSectionListItems = (
 export interface RuleDefinitionSectionProps
   extends React.ComponentProps<typeof EuiDescriptionList> {
   rule: Partial<RuleResponse>;
+  columnWidths?: EuiDescriptionListProps['columnWidths'];
   isInteractive?: boolean;
   dataTestSubj?: string;
 }
@@ -725,6 +726,7 @@ export interface RuleDefinitionSectionProps
 export const RuleDefinitionSection = ({
   rule,
   isInteractive = false,
+  columnWidths = DEFAULT_DESCRIPTION_LIST_COLUMN_WIDTHS,
   dataTestSubj,
   ...descriptionListProps
 }: RuleDefinitionSectionProps) => {
@@ -745,7 +747,7 @@ export const RuleDefinitionSection = ({
         type={descriptionListProps.type ?? 'column'}
         rowGutterSize={descriptionListProps.rowGutterSize ?? 'm'}
         listItems={definitionSectionListItems}
-        columnWidths={DESCRIPTION_LIST_COLUMN_WIDTHS}
+        columnWidths={columnWidths}
         data-test-subj="listItemColumnStepRuleDescription"
         {...descriptionListProps}
       />
