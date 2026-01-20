@@ -7,6 +7,7 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { EuiButton, EuiToolTip } from '@elastic/eui';
+import { useQuery } from '@kbn/react-query';
 import { useUserPrivileges } from '../../../common/components/user_privileges';
 import { RuleUpgradeEventTypes } from '../../../common/lib/telemetry/events/rule_upgrade/types';
 import type { ReviewPrebuiltRuleUpgradeFilter } from '../../../../common/api/detection_engine/prebuilt_rules/common/review_prebuilt_rules_upgrade_filter';
@@ -26,6 +27,7 @@ import {
   ThreeWayDiffConflict,
   SkipRuleUpgradeReasonEnum,
   UpgradeConflictResolutionEnum,
+  type RuleUpgradeInfoForReview,
 } from '../../../../common/api/detection_engine';
 import { usePrebuiltRulesUpgradeState } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/use_prebuilt_rules_upgrade_state';
 import { useOutdatedMlJobsUpgradeModal } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/use_ml_jobs_upgrade_modal';
@@ -47,6 +49,7 @@ import { RULES_TABLE_INITIAL_PAGE_SIZE } from '../../rule_management_ui/componen
 import type { RulesConflictStats } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/use_upgrade_with_conflicts_modal/conflicts_description';
 import { useKibana } from '../../../common/lib/kibana';
 import { TabContentPadding } from '../components/rule_details/rule_details_flyout';
+import { DETECTION_ENGINE_RULES_URL_FIND } from '../../../../common/constants';
 
 const REVIEW_PREBUILT_RULES_UPGRADE_REFRESH_INTERVAL = 5 * 60 * 1000;
 const RULE_UPGRADE_FLYOUT_BUTTON_EVENT_VERSION = 2;
@@ -73,7 +76,7 @@ export function usePrebuiltRulesUpgrade({
   const { isRulesCustomizationEnabled } = usePrebuiltRulesCustomizationStatus();
   const isUpgradingSecurityPackages = useIsUpgradingSecurityPackages();
   const [loadingRules, setLoadingRules] = useState<RuleSignatureId[]>([]);
-  const { telemetry } = useKibana().services;
+  const { telemetry, http } = useKibana().services;
   const canEditRules = useUserPrivileges().rulesPrivileges.edit;
 
   const {
@@ -97,10 +100,92 @@ export function usePrebuiltRulesUpgrade({
     }
   );
 
-  const upgradeableRules = useMemo(
-    () => upgradeReviewResponse?.rules ?? [],
-    [upgradeReviewResponse]
+  // Calculate deprecated-only rule IDs (exclude rules that are already upgradeable)
+  const deprecatedOnlyRuleIds = useMemo(() => {
+    const rules = upgradeReviewResponse?.rules ?? [];
+    const deprecatedRules = upgradeReviewResponse?.deprecated_rules;
+
+    if (!deprecatedRules || Object.keys(deprecatedRules).length === 0) {
+      return [];
+    }
+
+    const upgradeableRuleIds = new Set(rules.map((rule) => rule.rule_id));
+    return Object.keys(deprecatedRules).filter((ruleId) => !upgradeableRuleIds.has(ruleId));
+  }, [upgradeReviewResponse]);
+
+  // Fetch deprecated-only rules directly from the API with raw KQL filter
+  const { data: deprecatedRulesData } = useQuery(
+    ['fetchDeprecatedRules', deprecatedOnlyRuleIds],
+    async ({ signal }) => {
+      if (deprecatedOnlyRuleIds.length === 0) {
+        return { rules: [], total: 0 };
+      }
+
+      // Build KQL filter with proper quoting for each rule ID
+      const ruleIdFilters = deprecatedOnlyRuleIds
+        .map((ruleId) => `alert.attributes.params.ruleId: "${ruleId}"`)
+        .join(' OR ');
+
+      // Filter for elastic rules (immutable) and the specific rule IDs
+      const kqlFilter = `alert.attributes.params.immutable: true AND (${ruleIdFilters})`;
+
+      const response = await http.fetch<{
+        data: RuleResponse[];
+        total: number;
+      }>(DETECTION_ENGINE_RULES_URL_FIND, {
+        method: 'GET',
+        version: '2023-10-31',
+        query: {
+          page: 1,
+          per_page: deprecatedOnlyRuleIds.length,
+          filter: kqlFilter, // Raw KQL passed directly to API
+        },
+        signal,
+      });
+
+      return { rules: response.data, total: response.total };
+    },
+    {
+      enabled: deprecatedOnlyRuleIds.length > 0,
+      staleTime: 0,
+    }
   );
+
+  // Combine upgradeable rules with deprecated-only rules
+  const upgradeableRules = useMemo(() => {
+    const rules = upgradeReviewResponse?.rules ?? [];
+
+    if (!deprecatedRulesData?.rules || deprecatedRulesData.rules.length === 0) {
+      return rules;
+    }
+
+    // Convert deprecated-only rules to RuleUpgradeInfoForReview objects
+    const deprecatedRulesList: RuleUpgradeInfoForReview[] = deprecatedRulesData.rules.map(
+      (rule) => {
+        // Create empty diff for deprecated-only rules
+        const emptyDiff: RuleUpgradeInfoForReview['diff'] = {
+          num_fields_with_updates: 0,
+          num_fields_with_conflicts: 0,
+          num_fields_with_non_solvable_conflicts: 0,
+          fields: {},
+        };
+
+        return {
+          id: rule.id,
+          rule_id: rule.rule_id,
+          version: rule.version,
+          current_rule: rule,
+          target_rule: rule, // Same as current since there's no update
+          diff: emptyDiff,
+          revision: rule.revision,
+          has_base_version: false,
+        };
+      }
+    );
+
+    // Combine upgradeable and deprecated-only rules
+    return [...rules, ...deprecatedRulesList];
+  }, [upgradeReviewResponse, deprecatedRulesData]);
 
   const { rulesUpgradeState, setRuleFieldResolvedValue } =
     usePrebuiltRulesUpgradeState(upgradeableRules);
@@ -343,6 +428,11 @@ export function usePrebuiltRulesUpgrade({
         content: <TabContentPadding>{updateTabContent}</TabContentPadding>,
       };
 
+      // Check if this is a deprecated-only rule (no actual diff)
+      const isDeprecatedOnly =
+        ruleUpgradeState.diff.num_fields_with_updates === 0 &&
+        Object.keys(ruleUpgradeState.diff.fields).length === 0;
+
       const jsonViewTab = {
         id: 'jsonViewUpdates',
         name: (
@@ -363,6 +453,11 @@ export function usePrebuiltRulesUpgrade({
           </div>
         ),
       };
+
+      // Hide JSON view tab for deprecated-only rules (no diff to show)
+      if (isDeprecatedOnly) {
+        return [updatesTab];
+      }
 
       return [updatesTab, jsonViewTab];
     },

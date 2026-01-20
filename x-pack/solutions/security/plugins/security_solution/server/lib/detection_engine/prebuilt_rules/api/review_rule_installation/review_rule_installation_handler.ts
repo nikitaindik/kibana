@@ -23,6 +23,10 @@ import type { BasicRuleInfo } from '../../logic/basic_rule_info';
 import type { MlAuthz } from '../../../../machine_learning/authz';
 import type { PrebuiltRuleAssetsFilter } from '../../../../../../common/api/detection_engine/prebuilt_rules/common/prebuilt_rule_assets_filter';
 import type { PrebuiltRuleAssetsSort } from '../../../../../../common/api/detection_engine/prebuilt_rules/common/prebuilt_rule_assets_sort';
+import {
+  createRuleDeprecationsClient,
+  type RuleDeprecationsMap,
+} from '../../logic/rule_deprecations/rule_deprecations_client';
 
 /*
   To ensure a smooth transition from a non-paginated API to a paginated API, we will release the changes in two stages:
@@ -64,6 +68,31 @@ export const reviewRuleInstallationHandler = async (
     const ruleObjectsClient = createPrebuiltRuleObjectsClient(rulesClient);
     const mlAuthz = ctx.securitySolution.getMlAuthz();
 
+    // Create deprecations client to fetch rule deprecation info from the package
+    // This is fetched early so we can exclude deprecated rules from the response
+    const fleetServices = ctx.securitySolution.getInternalFleetServices();
+    const ruleDeprecationsClient = createRuleDeprecationsClient(soClient, fleetServices.packages);
+    const deprecationsMap = await ruleDeprecationsClient.fetchRuleDeprecations();
+
+    const installedRuleVersions = await ruleObjectsClient.fetchInstalledRuleVersions();
+    logger.debug(
+      `reviewRuleInstallationHandler: Found ${installedRuleVersions.length} currently installed prebuilt rules`
+    );
+    const installedRuleVersionsMap = new Map(
+      installedRuleVersions.map((version) => [version.rule_id, version])
+    );
+
+    // Get installable versions, excluding deprecated rules
+    const installableVersions = await getInstallableRuleVersions(
+      ruleAssetsClient,
+      logger,
+      mlAuthz,
+      installedRuleVersionsMap,
+      deprecationsMap,
+      sort,
+      filter
+    );
+
     const fetchStats = async (): Promise<{ tags: string[]; numRulesToInstall: number }> => {
       // If there's no filter, we can reuse already fetched installable rule versions array
       const requestHasFilter = Boolean(Object.keys(filter ?? {}).length);
@@ -73,7 +102,8 @@ export const reviewRuleInstallationHandler = async (
             ruleAssetsClient,
             logger,
             mlAuthz,
-            installedRuleVersionsMap
+            installedRuleVersionsMap,
+            deprecationsMap
           )
         : installableVersions;
 
@@ -84,23 +114,6 @@ export const reviewRuleInstallationHandler = async (
         numRulesToInstall: installableVersionsWithoutFilter.length,
       };
     };
-
-    const installedRuleVersions = await ruleObjectsClient.fetchInstalledRuleVersions();
-    logger.debug(
-      `reviewRuleInstallationHandler: Found ${installedRuleVersions.length} currently installed prebuilt rules`
-    );
-    const installedRuleVersionsMap = new Map(
-      installedRuleVersions.map((version) => [version.rule_id, version])
-    );
-
-    const installableVersions = await getInstallableRuleVersions(
-      ruleAssetsClient,
-      logger,
-      mlAuthz,
-      installedRuleVersionsMap,
-      sort,
-      filter
-    );
 
     const installableVersionsPage = installableVersions.slice((page - 1) * perPage, page * perPage);
 
@@ -113,10 +126,10 @@ export const reviewRuleInstallationHandler = async (
     const body: ReviewRuleInstallationResponseBody = {
       page,
       per_page: perPage,
-      total: installableVersions.length, // Number of rules matching the filter
+      total: installableVersions.length, // Number of rules matching the filter (excluding deprecated)
       stats: {
         tags,
-        num_rules_to_install: numRulesToInstall, // Number of installable rules without applying filters
+        num_rules_to_install: numRulesToInstall, // Number of installable rules without applying filters (excluding deprecated)
       },
       rules: installableRuleAssetsPage.map((prebuiltRuleAsset) =>
         convertPrebuiltRuleAssetToRuleResponse(prebuiltRuleAsset)
@@ -143,6 +156,7 @@ async function getInstallableRuleVersions(
   logger: Logger,
   mlAuthz: MlAuthz,
   installedRuleVersionsMap: Map<string, RuleSummary>,
+  deprecationsMap: RuleDeprecationsMap,
   sort?: PrebuiltRuleAssetsSort,
   filter?: PrebuiltRuleAssetsFilter
 ): Promise<BasicRuleInfo[]> {
@@ -172,5 +186,17 @@ async function getInstallableRuleVersions(
     `reviewRuleInstallationHandler: ${installableRuleVersions.length} rules remaining after checking license restrictions`
   );
 
-  return installableRuleVersions;
+  // Filter out deprecated rules (rules with stage 'deprecated')
+  const nonDeprecatedRuleVersions = installableRuleVersions.filter((ruleVersion) => {
+    const deprecationEntry = deprecationsMap[ruleVersion.rule_id];
+    // Exclude rules that are fully deprecated (stage === 'deprecated')
+    // Rules with 'deprecation_started' stage are still shown for installation
+    return !deprecationEntry || deprecationEntry.deprecation.stage !== 'deprecated';
+  });
+
+  logger.debug(
+    `reviewRuleInstallationHandler: ${nonDeprecatedRuleVersions.length} rules remaining after excluding deprecated rules`
+  );
+
+  return nonDeprecatedRuleVersions;
 }

@@ -1045,6 +1045,27 @@ export const NON_SOLVABLE_CONFLICT_TOOLTIP = i18n.translate(
   }
 );
 
+export const COLUMN_DEPRECATION = i18n.translate(
+  'xpack.securitySolution.detectionEngine.rules.allRules.columns.deprecationTitle',
+  {
+    defaultMessage: 'Deprecation',
+  }
+);
+
+export const DEPRECATED_LABEL = i18n.translate(
+  'xpack.securitySolution.detectionEngine.upgradeRules.deprecatedLabel',
+  {
+    defaultMessage: 'Deprecated',
+  }
+);
+
+export const DEPRECATED_TOOLTIP = i18n.translate(
+  'xpack.securitySolution.detectionEngine.upgradeRules.deprecatedTooltipDescription',
+  {
+    defaultMessage: 'This Elastic rule has been deprecated.',
+  }
+);
+
 export const NO_RULES = i18n.translate(
   'xpack.securitySolution.detectionEngine.rules.allRules.filters.noRulesTitle',
   {

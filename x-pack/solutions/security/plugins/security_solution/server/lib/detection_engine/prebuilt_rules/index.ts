@@ -8,3 +8,11 @@
 export { registerPrebuiltRulesRoutes } from './api/register_routes';
 export { prebuiltRuleAssetType } from './logic/rule_assets/prebuilt_rule_assets_type';
 export { PrebuiltRuleAsset } from './model/rule_assets/prebuilt_rule_asset';
+export {
+  createRuleDeprecationsClient,
+  type IRuleDeprecationsClient,
+  type RuleDeprecationStage,
+  type RuleDeprecationInfo,
+  type RuleDeprecationEntry,
+  type RuleDeprecationsMap,
+} from './logic/rule_deprecations/rule_deprecations_client';

@@ -9,6 +9,7 @@ import type { EuiBasicTableColumn } from '@elastic/eui';
 import {
   EuiBadge,
   EuiButtonEmpty,
+  EuiIcon,
   EuiLink,
   EuiLoadingSpinner,
   EuiText,
@@ -16,7 +17,10 @@ import {
 } from '@elastic/eui';
 import React, { useMemo } from 'react';
 import { RuleUpgradeEventTypes } from '../../../../../common/lib/telemetry/events/rule_upgrade/types';
-import { ThreeWayDiffConflict } from '../../../../../../common/api/detection_engine';
+import {
+  ThreeWayDiffConflict,
+  type RuleDeprecationInfo,
+} from '../../../../../../common/api/detection_engine';
 import type { RuleUpgradeState } from '../../../../rule_management/model/prebuilt_rule_upgrade/rule_upgrade_state';
 import { RulesTableEmptyColumnName } from '../rules_table_empty_column_name';
 import { SHOW_RELATED_INTEGRATIONS_SETTING } from '../../../../../../common/constants';
@@ -182,6 +186,36 @@ const CONFLICT_COLUMN: TableColumn = {
   truncateText: true,
 };
 
+const createDeprecationColumn = (
+  deprecatedRules: Record<string, { deprecation: RuleDeprecationInfo }> | undefined
+): TableColumn => ({
+  field: 'rule_id',
+  name: <RulesTableEmptyColumnName name={i18n.COLUMN_DEPRECATION} />,
+  align: 'center',
+  render: (ruleId: RuleSignatureId) => {
+    const deprecationEntry = deprecatedRules?.[ruleId];
+    if (!deprecationEntry) {
+      return null;
+    }
+
+    return (
+      <EuiToolTip content={deprecationEntry.deprecation.reason || i18n.DEPRECATED_TOOLTIP}>
+        <EuiBadge
+          color="danger"
+          data-test-subj="upgradeRulesTableDeprecationBadge"
+          aria-label={i18n.DEPRECATED_LABEL}
+          tabIndex={0}
+        >
+          <EuiIcon type="warning" size="s" />
+          &nbsp;{i18n.DEPRECATED_LABEL}
+        </EuiBadge>
+      </EuiToolTip>
+    );
+  },
+  width: '120px',
+  truncateText: true,
+});
+
 const createUpgradeButtonColumn = (
   upgradeRules: UpgradePrebuiltRulesTableActions['upgradeRules'],
   openRulePreview: UpgradePrebuiltRulesTableActions['openRulePreview'],
@@ -244,18 +278,24 @@ export const useUpgradePrebuiltRulesTableColumns = (): TableColumn[] => {
   const canEditRules = useUserPrivileges().rulesPrivileges.edit;
   const [showRelatedIntegrations] = useUiSetting$<boolean>(SHOW_RELATED_INTEGRATIONS_SETTING);
   const {
-    state: { loadingRules, isRefetching, isUpgradingSecurityPackages },
+    state: { loadingRules, isRefetching, isUpgradingSecurityPackages, upgradeReviewResponse },
     actions: { upgradeRules, openRulePreview },
   } = useUpgradePrebuiltRulesTableContext();
   const isDisabled = isRefetching || isUpgradingSecurityPackages;
   const { isRulesCustomizationEnabled } = usePrebuiltRulesCustomizationStatus();
   const { telemetry } = useKibana().services;
 
+  const deprecationColumn = useMemo(
+    () => createDeprecationColumn(upgradeReviewResponse?.deprecated_rules),
+    [upgradeReviewResponse?.deprecated_rules]
+  );
+
   return useMemo(
     () => [
       RULE_NAME_COLUMN,
       MODIFIED_COLUMN,
       ...(isRulesCustomizationEnabled ? [CONFLICT_COLUMN] : []),
+      deprecationColumn,
       ...(showRelatedIntegrations ? [INTEGRATIONS_COLUMN] : []),
       TAGS_COLUMN,
       {

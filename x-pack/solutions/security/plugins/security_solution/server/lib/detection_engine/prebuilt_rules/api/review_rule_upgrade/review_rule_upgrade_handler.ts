@@ -12,6 +12,7 @@ import type {
   ReviewRuleUpgradeRequestBody,
   ReviewRuleUpgradeResponseBody,
   ReviewRuleUpgradeSort,
+  RuleUpgradeInfoForReview,
 } from '../../../../../../common/api/detection_engine/prebuilt_rules';
 import type { SecuritySolutionRequestHandlerContext } from '../../../../../types';
 import { buildSiemResponse } from '../../../routes/utils';
@@ -25,6 +26,11 @@ import { zipRuleVersions } from '../../logic/rule_versions/zip_rule_versions';
 import { calculateRuleUpgradeInfo } from './calculate_rule_upgrade_info';
 import type { MlAuthz } from '../../../../machine_learning/authz';
 import { getPossibleUpgrades } from '../../logic/utils';
+import {
+  createRuleDeprecationsClient,
+  type RuleDeprecationEntry,
+  type RuleDeprecationsMap,
+} from '../../logic/rule_deprecations/rule_deprecations_client';
 
 const DEFAULT_SORT: ReviewRuleUpgradeSort = {
   field: 'name',
@@ -47,15 +53,51 @@ export const reviewRuleUpgradeHandler = async (
     const ruleObjectsClient = createPrebuiltRuleObjectsClient(rulesClient);
     const mlAuthz = ctx.securitySolution.getMlAuthz();
 
-    const { diffResults, totalUpgradeableRules } = await calculateUpgradeableRulesDiff({
-      ruleAssetsClient,
+    // Create deprecations client to fetch rule deprecation info from the package
+    const fleetServices = ctx.securitySolution.getInternalFleetServices();
+    const ruleDeprecationsClient = createRuleDeprecationsClient(soClient, fleetServices.packages);
+
+    // Fetch deprecation info early so we can use it to identify deprecated-only rules
+    const deprecationsMap = await ruleDeprecationsClient.fetchRuleDeprecations();
+
+    const { diffResults, totalUpgradeableRules, upgradeableRuleIds } =
+      await calculateUpgradeableRulesDiff({
+        ruleAssetsClient,
+        ruleObjectsClient,
+        mlAuthz,
+        page,
+        perPage,
+        sort,
+        filter,
+      });
+
+    // Calculate upgrade info (no longer adding deprecation data here)
+    const rules: RuleUpgradeInfoForReview[] = calculateRuleUpgradeInfo(diffResults);
+
+    // Identify all deprecated rules (including both deprecated-only and deprecated with updates)
+    const allDeprecatedRuleIds = await identifyAllDeprecatedRules({
       ruleObjectsClient,
-      mlAuthz,
-      page,
-      perPage,
-      sort,
+      deprecationsMap,
       filter,
+      sort,
     });
+
+    // Build deprecated_rules map with ALL deprecated rules
+    const deprecatedRules: Record<string, RuleDeprecationEntry> = {};
+    for (const ruleId of allDeprecatedRuleIds) {
+      const deprecationEntry = deprecationsMap[ruleId];
+      if (deprecationEntry) {
+        deprecatedRules[ruleId] = deprecationEntry;
+      }
+    }
+
+    // Identify deprecated-only rules (deprecated but not upgradeable) for total count
+    const deprecatedOnlyRuleIds = allDeprecatedRuleIds.filter(
+      (ruleId) => !upgradeableRuleIds.has(ruleId)
+    );
+
+    // Update total to include deprecated-only rules
+    const total = totalUpgradeableRules + deprecatedOnlyRuleIds.length;
 
     const body: ReviewRuleUpgradeResponseBody = {
       stats: {
@@ -64,10 +106,11 @@ export const reviewRuleUpgradeHandler = async (
         num_rules_with_non_solvable_conflicts: 0,
         tags: [],
       },
-      rules: calculateRuleUpgradeInfo(diffResults),
+      rules,
+      deprecated_rules: Object.keys(deprecatedRules).length > 0 ? deprecatedRules : undefined,
       page,
       per_page: perPage,
-      total: totalUpgradeableRules,
+      total,
     };
 
     return response.ok({ body });
@@ -121,6 +164,7 @@ async function calculateUpgradeableRulesDiff({
   );
 
   const totalUpgradeableRules = upgradeableRules.length;
+  const upgradeableRuleIds = new Set(upgradeableRules.map((rule) => rule.rule_id));
 
   const pagedRuleIds = upgradeableRules
     .slice((page - 1) * perPage, page * perPage)
@@ -148,5 +192,48 @@ async function calculateUpgradeableRulesDiff({
   return {
     diffResults,
     totalUpgradeableRules,
+    upgradeableRuleIds,
   };
+}
+
+interface IdentifyAllDeprecatedRulesArgs {
+  ruleObjectsClient: IPrebuiltRuleObjectsClient;
+  deprecationsMap: RuleDeprecationsMap;
+  filter: ReviewPrebuiltRuleUpgradeFilter | undefined;
+  sort: ReviewRuleUpgradeSort;
+}
+
+/**
+ * Identifies all deprecated rules that are currently installed (respecting filter).
+ * This includes both deprecated-only rules and deprecated rules that also have updates available.
+ */
+async function identifyAllDeprecatedRules({
+  ruleObjectsClient,
+  deprecationsMap,
+  filter,
+  sort,
+}: IdentifyAllDeprecatedRulesArgs): Promise<string[]> {
+  // Get all installed rule versions (respecting filter)
+  const currentRuleVersions = filter?.rule_ids
+    ? await ruleObjectsClient.fetchInstalledRuleVersionsByIds({
+        ruleIds: filter.rule_ids,
+        sortField: sort.field,
+        sortOrder: sort.order,
+      })
+    : await ruleObjectsClient.fetchInstalledRuleVersions({
+        filter,
+        sortField: sort.field,
+        sortOrder: sort.order,
+      });
+
+  // Find all rules that are deprecated (regardless of whether they have updates)
+  const deprecatedRuleIds: string[] = [];
+  for (const ruleVersion of currentRuleVersions) {
+    const deprecationEntry = deprecationsMap[ruleVersion.rule_id];
+    if (deprecationEntry) {
+      deprecatedRuleIds.push(ruleVersion.rule_id);
+    }
+  }
+
+  return deprecatedRuleIds;
 }

@@ -92,6 +92,12 @@ export interface UpgradePrebuiltRulesTableState {
    * Currently selected table sorting
    */
   sortingOptions: UpgradePrebuiltRulesSortingOptions;
+  /**
+   * The upgrade review response containing deprecated_rules map
+   */
+  upgradeReviewResponse?: {
+    deprecated_rules?: Record<string, { deprecation: { stage: string; reason?: string } }>;
+  };
 }
 
 export interface UpgradePrebuiltRulesTableActions {
@@ -215,6 +221,7 @@ export const UpgradePrebuiltRulesTableContextProvider = ({
           total: upgradeReviewResponse?.total ?? 0,
         },
         sortingOptions,
+        upgradeReviewResponse,
       },
       actions,
     }),
@@ -231,7 +238,7 @@ export const UpgradePrebuiltRulesTableContextProvider = ({
       loadingRules,
       lastUpdated,
       pagination,
-      upgradeReviewResponse?.total,
+      upgradeReviewResponse,
       sortingOptions,
       actions,
     ]

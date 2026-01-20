@@ -11,6 +11,7 @@ import type { PartialThreeWayRuleDiff } from '../model';
 import type { RuleResponse, RuleVersion } from '../../model/rule_schema';
 import { FindRulesSortField } from '../../rule_management';
 import { ReviewPrebuiltRuleUpgradeFilter } from '../common/review_prebuilt_rules_upgrade_filter';
+import type { RuleDeprecationEntry } from '../common/rule_deprecation_info';
 
 export type ReviewRuleUpgradeSort = z.infer<typeof ReviewRuleUpgradeSort>;
 export const ReviewRuleUpgradeSort = z.object({
@@ -48,6 +49,12 @@ export interface ReviewRuleUpgradeResponseBody {
 
   /** Info about individual rules: one object per each rule available for upgrade */
   rules: RuleUpgradeInfoForReview[];
+
+  /**
+   * Map of deprecated rules that don't have an upgrade available.
+   * Keys are rule_id, values are RuleDeprecationEntry objects.
+   */
+  deprecated_rules?: Record<string, RuleDeprecationEntry>;
 
   /** The requested page number */
   page: number;
