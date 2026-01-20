@@ -166,3 +166,17 @@ export const RULE_BASE_VERSION_IS_MISSING_DESCRIPTION = i18n.translate(
       "The original, unedited version of this Elastic rule couldn't be found. This sometimes happens when a rule hasn't been updated in a while. You can still update this rule, but will only have access to its current version and the incoming Elastic update. Updating Elastic rules more often can help you avoid this in the future. We encourage you to review this update carefully and ensure your changes are not accidentally overwritten.",
   }
 );
+
+export const RULE_DEPRECATION_STARTED_TITLE = i18n.translate(
+  'xpack.securitySolution.detectionEngine.upgradeFlyout.ruleDeprecationStartedTitle',
+  {
+    defaultMessage: 'This rule is going to be deprecated soon',
+  }
+);
+
+export const RULE_DEPRECATED_TITLE = i18n.translate(
+  'xpack.securitySolution.detectionEngine.upgradeFlyout.ruleDeprecatedTitle',
+  {
+    defaultMessage: 'This rule is deprecated',
+  }
+);

@@ -55,6 +55,13 @@ export const UPDATE_BUTTON_LABEL = i18n.translate(
   }
 );
 
+export const DELETE_BUTTON_LABEL = i18n.translate(
+  'xpack.securitySolution.detectionEngine.ruleDetails.deleteButtonLabel',
+  {
+    defaultMessage: 'Delete rule',
+  }
+);
+
 export const UPDATE_FLYOUT_PER_FIELD_TOOLTIP_DESCRIPTION = i18n.translate(
   'xpack.securitySolution.detectionEngine.ruleDetails.perFieldTooltip',
   {

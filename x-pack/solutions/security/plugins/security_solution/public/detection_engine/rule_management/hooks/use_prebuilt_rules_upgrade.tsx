@@ -6,7 +6,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { EuiButton, EuiToolTip } from '@elastic/eui';
+import { EuiButton, EuiToolTip, EuiFlexGroup, EuiFlexItem } from '@elastic/eui';
 import { useQuery } from '@kbn/react-query';
 import { useUserPrivileges } from '../../../common/components/user_privileges';
 import { RuleUpgradeEventTypes } from '../../../common/lib/telemetry/events/rule_upgrade/types';
@@ -35,12 +35,15 @@ import {
   ConfirmRulesUpgrade,
   useUpgradeWithConflictsModal,
 } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/use_upgrade_with_conflicts_modal';
+import { useExecuteBulkAction } from '../logic/bulk_actions/use_execute_bulk_action';
+import { BulkActionTypeEnum } from '../../../../common/api/detection_engine/rule_management';
 import * as ruleDetailsI18n from '../components/rule_details/translations';
 import * as i18n from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/translations';
 import { UpgradeFlyoutSubHeader } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/upgrade_flyout_subheader';
 import { CustomizationDisabledCallout } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/customization_disabled_callout';
 import { RuleUpgradeTab } from '../components/rule_details/three_way_diff';
 import { RuleTypeChangeCallout } from '../../rule_management_ui/components/rules_table/upgrade_prebuilt_rules_table/rule_type_change_callout';
+import { RuleDeprecationCallout } from '../components/rule_details/three_way_diff/rule_upgrade/rule_deprecation_callout';
 import { RuleDiffTab } from '../components/rule_details/rule_diff_tab';
 import type { RulePreviewFlyoutCloseReason } from '../../rule_management_ui/components/rules_table/use_rule_preview_flyout';
 import { useRulePreviewFlyout } from '../../rule_management_ui/components/rules_table/use_rule_preview_flyout';
@@ -324,12 +327,31 @@ export function usePrebuiltRulesUpgrade({
   ]);
 
   const subHeaderFactory = useCallback(
-    (rule: RuleResponse) =>
-      rulesUpgradeState[rule.rule_id] ? (
-        <UpgradeFlyoutSubHeader ruleUpgradeState={rulesUpgradeState[rule.rule_id]} />
-      ) : null,
-    [rulesUpgradeState]
+    (rule: RuleResponse) => {
+      const ruleUpgradeState = rulesUpgradeState[rule.rule_id];
+      if (!ruleUpgradeState) {
+        return null;
+      }
+
+      const deprecationEntry = upgradeReviewResponse?.deprecated_rules?.[rule.rule_id];
+      const deprecationCallout = deprecationEntry ? (
+        <RuleDeprecationCallout
+          stage={deprecationEntry.deprecation.stage}
+          reason={deprecationEntry.deprecation.reason}
+        />
+      ) : null;
+
+      return (
+        <>
+          {deprecationCallout}
+          <UpgradeFlyoutSubHeader ruleUpgradeState={ruleUpgradeState} />
+        </>
+      );
+    },
+    [rulesUpgradeState, upgradeReviewResponse]
   );
+  const { executeBulkAction } = useExecuteBulkAction();
+
   const ruleActionsFactory = useCallback(
     (rule: RuleResponse, closeRulePreview: () => void, isEditingRule: boolean) => {
       const ruleUpgradeState = rulesUpgradeState[rule.rule_id];
@@ -337,8 +359,17 @@ export function usePrebuiltRulesUpgrade({
         return null;
       }
 
+      // Check if rule has updates (is in the 'rules' array)
+      const hasUpdates =
+        upgradeReviewResponse?.rules?.some((r) => r.rule_id === rule.rule_id) ?? false;
+
+      // Check if rule is deprecated
+      const isDeprecated = upgradeReviewResponse?.deprecated_rules?.[rule.rule_id] !== undefined;
+
       const hasRuleTypeChange = ruleUpgradeState.diff.fields.type?.has_update ?? false;
-      return (
+      const isDeleting = loadingRules.includes(rule.id);
+
+      const updateButton = hasUpdates ? (
         <EuiButton
           disabled={
             !canEditRules ||
@@ -346,7 +377,8 @@ export function usePrebuiltRulesUpgrade({
             isRefetching ||
             isUpgradingSecurityPackages ||
             (ruleUpgradeState.hasUnresolvedConflicts && !hasRuleTypeChange) ||
-            isEditingRule
+            isEditingRule ||
+            isDeleting
           }
           onClick={() => {
             if (hasRuleTypeChange || isRulesCustomizationEnabled === false) {
@@ -362,7 +394,46 @@ export function usePrebuiltRulesUpgrade({
         >
           {i18n.UPDATE_BUTTON_LABEL}
         </EuiButton>
-      );
+      ) : null;
+
+      const deleteButton = isDeprecated ? (
+        <EuiButton
+          color="danger"
+          disabled={
+            !canEditRules ||
+            loadingRules.includes(rule.rule_id) ||
+            isRefetching ||
+            isUpgradingSecurityPackages ||
+            isEditingRule ||
+            isDeleting
+          }
+          onClick={async () => {
+            await executeBulkAction({
+              type: BulkActionTypeEnum.delete,
+              ids: [rule.id],
+            });
+            closeRulePreview();
+          }}
+          fill
+          iconType="trash"
+          data-test-subj="deleteDeprecatedRuleFromFlyoutButton"
+        >
+          {i18n.DELETE_BUTTON_LABEL}
+        </EuiButton>
+      ) : null;
+
+      // If both buttons exist, wrap them in a flex group
+      if (updateButton && deleteButton) {
+        return (
+          <EuiFlexGroup gutterSize="s">
+            <EuiFlexItem grow={false}>{updateButton}</EuiFlexItem>
+            <EuiFlexItem grow={false}>{deleteButton}</EuiFlexItem>
+          </EuiFlexGroup>
+        );
+      }
+
+      // Return the single button (or null if neither exists)
+      return updateButton || deleteButton;
     },
     [
       rulesUpgradeState,
@@ -373,6 +444,8 @@ export function usePrebuiltRulesUpgrade({
       isRulesCustomizationEnabled,
       upgradeRulesToTarget,
       upgradeRulesToResolved,
+      upgradeReviewResponse,
+      executeBulkAction,
     ]
   );
   const extraTabsFactory = useCallback(
@@ -454,9 +527,9 @@ export function usePrebuiltRulesUpgrade({
         ),
       };
 
-      // Hide JSON view tab for deprecated-only rules (no diff to show)
+      // Hide both tabs for deprecated-only rules (no diff to show, callout is in header)
       if (isDeprecatedOnly) {
-        return [updatesTab];
+        return [];
       }
 
       return [updatesTab, jsonViewTab];

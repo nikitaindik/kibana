@@ -332,15 +332,6 @@ export const useUpgradePrebuiltRulesTableColumns = (): TableColumn[] => {
           ]
         : []),
     ],
-    [
-      isRulesCustomizationEnabled,
-      showRelatedIntegrations,
-      canEditRules,
-      upgradeRules,
-      openRulePreview,
-      loadingRules,
-      isDisabled,
-      telemetry,
-    ]
+    [isRulesCustomizationEnabled, deprecationColumn, showRelatedIntegrations, canEditRules, upgradeRules, openRulePreview, loadingRules, isDisabled, telemetry]
   );
 };
