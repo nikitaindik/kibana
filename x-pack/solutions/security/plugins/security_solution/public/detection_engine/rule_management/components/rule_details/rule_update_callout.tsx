@@ -33,6 +33,16 @@ const RuleUpdateCalloutComponent = ({
     onUpgrade,
   });
 
+  // Check if rule is deprecated - if so, don't show this callout
+  const isDeprecated = useMemo(
+    () => upgradeReviewResponse?.deprecated_rules?.[rule.rule_id] !== undefined,
+    [upgradeReviewResponse, rule.rule_id]
+  );
+
+  if (isDeprecated) {
+    return null;
+  }
+
   const isRuleUpgradeable = useMemo(
     () => upgradeReviewResponse !== undefined && upgradeReviewResponse.total > 0,
     [upgradeReviewResponse]

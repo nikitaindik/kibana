@@ -24,8 +24,9 @@ export const RuleDeprecationCallout = ({ stage, reason }: RuleDeprecationCallout
   return (
     <>
       <EuiSpacer size="m" />
-      <EuiCallOut color="danger" size="s" title={title}>
+      <EuiCallOut color="danger" size="s" title={title} iconType="warning">
         {reason && <p>{reason}</p>}
+        <p>{i18n.RULE_DEPRECATION_DELETE_INSTRUCTION}</p>
       </EuiCallOut>
       <EuiSpacer size="s" />
     </>

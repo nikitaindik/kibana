@@ -180,3 +180,11 @@ export const RULE_DEPRECATED_TITLE = i18n.translate(
     defaultMessage: 'This rule is deprecated',
   }
 );
+
+export const RULE_DEPRECATION_DELETE_INSTRUCTION = i18n.translate(
+  'xpack.securitySolution.detectionEngine.upgradeFlyout.ruleDeprecationDeleteInstruction',
+  {
+    defaultMessage:
+      'Delete this rule to remove the warning. If you want to keep using the rule, you can duplicate it before deleting.',
+  }
+);

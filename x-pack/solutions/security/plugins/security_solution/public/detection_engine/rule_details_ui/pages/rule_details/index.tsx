@@ -155,6 +155,8 @@ import { RuleDetailTabs, useRuleDetailsTabs } from './use_rule_details_tabs';
 import { useIsExperimentalFeatureEnabled } from '../../../../common/hooks/use_experimental_features';
 import { useRuleUpdateCallout } from '../../../rule_management/hooks/use_rule_update_callout';
 import { useUserPrivileges } from '../../../../common/components/user_privileges';
+import { usePrebuiltRulesUpgrade } from '../../../rule_management/hooks/use_prebuilt_rules_upgrade';
+import { RuleDeprecationCallout } from '../../../rule_management/components/rule_details/three_way_diff/rule_upgrade/rule_deprecation_callout';
 
 const RULE_EXCEPTION_LIST_TYPES = [
   ExceptionListTypeEnum.DETECTION,
@@ -439,6 +441,23 @@ export const RuleDetailsPage = connector(
       onUpgrade: refreshRule,
     });
 
+    // Check if rule is deprecated
+    const { upgradeReviewResponse: deprecationCheckResponse } = usePrebuiltRulesUpgrade({
+      pagination: { page: 1, perPage: 1 },
+      filter: rule ? { rule_ids: [rule.id] } : { rule_ids: [] },
+      onUpgrade: refreshRule,
+    });
+
+    const isDeprecated = useMemo(() => {
+      if (!rule) return false;
+      return deprecationCheckResponse?.deprecated_rules?.[rule.rule_id] !== undefined;
+    }, [rule, deprecationCheckResponse]);
+
+    const deprecationEntry = useMemo(() => {
+      if (!rule || !isDeprecated) return undefined;
+      return deprecationCheckResponse?.deprecated_rules?.[rule.rule_id];
+    }, [rule, isDeprecated, deprecationCheckResponse]);
+
     const ruleStatusInfo = useMemo(() => {
       return (
         <>
@@ -614,7 +633,17 @@ export const RuleDetailsPage = connector(
       <>
         <NeedAdminForUpdateRulesCallOut />
         <MissingDetectionsPrivilegesCallOut />
-        {upgradeCallout}
+        {isDeprecated && deprecationEntry ? (
+          <>
+            <RuleDeprecationCallout
+              stage={deprecationEntry.deprecation.stage}
+              reason={deprecationEntry.deprecation.reason}
+            />
+            <EuiSpacer size="l" />
+          </>
+        ) : (
+          upgradeCallout
+        )}
         {isBulkDuplicateConfirmationVisible && (
           <BulkActionDuplicateExceptionsConfirmation
             onCancel={cancelRuleDuplication}
