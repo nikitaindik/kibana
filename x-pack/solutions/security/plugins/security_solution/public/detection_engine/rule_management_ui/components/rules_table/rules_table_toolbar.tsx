@@ -11,6 +11,7 @@ import { NewChat } from '@kbn/elastic-assistant';
 import { TabNavigation } from '../../../../common/components/navigation/tab_navigation';
 import { usePrebuiltRulesStatus } from '../../../rule_management/logic/prebuilt_rules/use_prebuilt_rules_status';
 import { useRuleManagementFilters } from '../../../rule_management/logic/use_rule_management_filters';
+import { usePrebuiltRulesUpgradeReview } from '../../../rule_management/logic/prebuilt_rules/use_prebuilt_rules_upgrade_review';
 import * as i18n from './translations';
 import { getPromptContextFromDetectionRules } from '../../../../assistant/helpers';
 import { useRulesTableContext } from './rules_table/rules_table_context';
@@ -32,12 +33,26 @@ export const RulesTableToolbar = React.memo(() => {
   const { data: ruleManagementFilters } = useRuleManagementFilters();
   const { data: prebuiltRulesStatus } = usePrebuiltRulesStatus();
 
+  // Fetch upgrade review to get total count including deprecated-only rules
+  const { data: upgradeReviewResponse } = usePrebuiltRulesUpgradeReview(
+    {
+      page: 1,
+      per_page: 1, // We only need the total count, not the actual rules
+    },
+    {
+      // Don't refetch too often, use the status endpoint for that
+      staleTime: 30000, // 30 seconds
+    }
+  );
+
   const canReadRules = useUserPrivileges().rulesPrivileges.read;
 
   const installedTotal =
     (ruleManagementFilters?.rules_summary.custom_count ?? 0) +
     (ruleManagementFilters?.rules_summary.prebuilt_installed_count ?? 0);
-  const updateTotal = prebuiltRulesStatus?.stats.num_prebuilt_rules_to_upgrade ?? 0;
+  // Use upgradeReviewResponse total which includes deprecated-only rules, fallback to status endpoint
+  const updateTotal =
+    upgradeReviewResponse?.total ?? prebuiltRulesStatus?.stats.num_prebuilt_rules_to_upgrade ?? 0;
 
   const shouldDisplayRuleUpdatesTab = canReadRules && updateTotal > 0;
 
