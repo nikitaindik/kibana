@@ -18,3 +18,10 @@ export {
   commonSecurityRuleCreatedTriggerDefinition,
 } from './rule_created_trigger';
 export type { SecurityRuleCreatedEvent } from './rule_created_trigger';
+
+export {
+  SECURITY_INTEGRATION_INSTALLED_TRIGGER_ID,
+  securityIntegrationInstalledEventSchema,
+  commonSecurityIntegrationInstalledTriggerDefinition,
+} from './integration_installed_trigger';
+export type { SecurityIntegrationInstalledEvent } from './integration_installed_trigger';

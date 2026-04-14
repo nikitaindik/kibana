@@ -16,4 +16,9 @@ export const registerWorkflowTriggerDefinitions = (
   workflowsExtensions.registerTriggerDefinition(() =>
     import('./rule_created_trigger').then((m) => m.securityRuleCreatedPublicDefinition)
   );
+  workflowsExtensions.registerTriggerDefinition(() =>
+    import('./integration_installed_trigger').then(
+      (m) => m.securityIntegrationInstalledPublicDefinition
+    )
+  );
 };

@@ -20,7 +20,12 @@ import type { NewPackagePolicy, UpdatePackagePolicy } from '@kbn/fleet-plugin/co
 import { FLEET_ENDPOINT_PACKAGE } from '@kbn/fleet-plugin/common';
 
 import { registerScriptsLibraryRoutes } from './endpoint/routes/scripts_library';
-import { registerWorkflowTriggers, createEmitAlertsCreatedEvent } from './workflows/triggers';
+import {
+  registerWorkflowTriggers,
+  createEmitAlertsCreatedEvent,
+  createEmitIntegrationInstalledEvent,
+  type EmitIntegrationInstalledEvent,
+} from './workflows/triggers';
 import { registerWorkflowSteps } from './workflows/steps';
 import { registerAgents } from './agent_builder/agents';
 import { registerAttachments } from './agent_builder/attachments/register_attachments';
@@ -210,6 +215,7 @@ export class Plugin implements ISecuritySolutionPlugin {
   private usageCollection?: UsageCollectionSetup;
 
   private isServerless: boolean;
+  private emitIntegrationInstalledEvent?: EmitIntegrationInstalledEvent;
 
   constructor(context: PluginInitializerContext) {
     const serverConfig = createConfig(context);
@@ -575,6 +581,21 @@ export class Plugin implements ISecuritySolutionPlugin {
           getWorkflowsExtensionsStart: async () => {
             const [, startPlugins] = await core.getStartServices();
             return startPlugins.workflowsExtensions;
+          },
+          http: core.http,
+          logger: this.logger,
+        })
+      : undefined;
+
+    this.emitIntegrationInstalledEvent = plugins.workflowsExtensions
+      ? createEmitIntegrationInstalledEvent({
+          getWorkflowsExtensionsStart: async () => {
+            const [, startPlugins] = await core.getStartServices();
+            return startPlugins.workflowsExtensions;
+          },
+          getElasticsearch: async () => {
+            const [coreStart] = await core.getStartServices();
+            return coreStart.elasticsearch;
           },
           http: core.http,
           logger: this.logger,
@@ -1107,6 +1128,37 @@ export class Plugin implements ISecuritySolutionPlugin {
           return packagePolicy;
         }
       );
+
+      if (this.emitIntegrationInstalledEvent) {
+        const emitIntegrationEvent = this.emitIntegrationInstalledEvent;
+        this.logger.info('[DetectionCoverage] Registering packagePolicyPostCreate callback');
+        registerIngestCallback(
+          'packagePolicyPostCreate',
+          async (packagePolicy, _soClient, _esClient, _context, request) => {
+            const pkg = packagePolicy.package;
+            this.logger.info(
+              `[DetectionCoverage] packagePolicyPostCreate fired for: ${pkg?.name ?? 'unknown'}`
+            );
+            if (pkg) {
+              await emitIntegrationEvent({
+                spaceId: packagePolicy.namespace || 'default',
+                event: {
+                  package_name: pkg.name,
+                  package_title: pkg.title,
+                  package_version: pkg.version,
+                  integration_count: packagePolicy.inputs?.length ?? 1,
+                },
+                request,
+              });
+            }
+            return packagePolicy;
+          }
+        );
+      } else {
+        this.logger.warn(
+          '[DetectionCoverage] emitIntegrationInstalledEvent not available — workflow trigger will not fire'
+        );
+      }
     }
 
     if (plugins.taskManager) {

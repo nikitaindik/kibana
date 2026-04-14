@@ -9,14 +9,21 @@ import type { WorkflowsExtensionsServerPluginSetup } from '@kbn/workflows-extens
 import {
   commonSecurityAlertsCreatedTriggerDefinition,
   commonSecurityRuleCreatedTriggerDefinition,
+  commonSecurityIntegrationInstalledTriggerDefinition,
 } from '../../../common/workflows/triggers';
 
 export { createEmitAlertsCreatedEvent } from './emit_alerts_created_event';
 export type { EmitAlertsCreatedEvent } from './emit_alerts_created_event';
+
+export { createEmitIntegrationInstalledEvent } from './emit_integration_installed_event';
+export type { EmitIntegrationInstalledEvent } from './emit_integration_installed_event';
 
 export const registerWorkflowTriggers = (
   workflowsExtensions: WorkflowsExtensionsServerPluginSetup
 ): void => {
   workflowsExtensions.registerTriggerDefinition(commonSecurityAlertsCreatedTriggerDefinition);
   workflowsExtensions.registerTriggerDefinition(commonSecurityRuleCreatedTriggerDefinition);
+  workflowsExtensions.registerTriggerDefinition(
+    commonSecurityIntegrationInstalledTriggerDefinition
+  );
 };
